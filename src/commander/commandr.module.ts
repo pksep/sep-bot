@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { SequelizeModule } from '@nestjs/sequelize';
 import { getSequelizeConfig } from 'src/configs/postgres.config';
 import { getAppModule, getCoreModules } from 'src/configs/modules';
-import { User } from 'src/modules/users/model/users.model';
+import { Bot } from 'src/modules/bots/model/bots.model';
 
 @Module({
   providers: [],
@@ -12,7 +12,7 @@ import { User } from 'src/modules/users/model/users.model';
         logging: false
       })
     ),
-    SequelizeModule.forFeature([User]),
+    SequelizeModule.forFeature([Bot]),
     ...getCoreModules(),
     ...getAppModule()
   ]

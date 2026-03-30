@@ -72,7 +72,6 @@ import { AllExceptionsFilter } from './modules/logger/filters/all-exceptions.fil
 
   const configService = app.get(ConfigService);
   const portRun = configService.get(ConfigConstains.port);
-  const applicationType = configService.get(ConfigConstains.applicationType);
 
   const config = new DocumentBuilder()
     .setTitle('Chat Bot API')
@@ -128,6 +127,6 @@ import { AllExceptionsFilter } from './modules/logger/filters/all-exceptions.fil
   }
 
   await app.listen(portRun, () => {
-    console.info(`${applicationType}... Server running on port: ${portRun}`);
+    console.info(`chat-bot-api... Server running on port: ${portRun}`);
   });
 })();

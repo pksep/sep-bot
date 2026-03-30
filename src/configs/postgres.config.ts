@@ -35,7 +35,7 @@ export const getSequelizeConfig = ({
       },
       logging: !logging
         ? false
-        : configService.get<string>(ConfigConstains.applicationType) !== 'test',
+        : process.env.NODE_ENV !== 'test',
       models: models,
       autoLoadModels: false,
       pool: {

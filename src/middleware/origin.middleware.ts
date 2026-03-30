@@ -8,7 +8,7 @@ export class OriginMiddleware implements NestMiddleware {
       const config = configFactory();
 
       const allowedOrigins =
-        [config.allowedOrigin, config.erpClientOfflineHost]
+        [config.allowedOrigin]
           .filter(Boolean)
           .join(',')
           .split(',')
