@@ -1,19 +1,33 @@
-import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { io, Socket } from 'socket.io-client';
-import axios, { AxiosInstance } from 'axios';
+import { AmqpConnection, RabbitSubscribe } from '@golevelup/nestjs-rabbitmq';
 import { LoggerService } from '../logger/logger.service';
-import { ChatApiResponse, ChatMessage, ChatUser, WsChangePayload } from './interfaces/chat-types';
+import {
+  ChatApiResponse,
+  ChatMessage,
+  ChatUser
+} from './interfaces/chat-types';
+import {
+  BOT_COMMANDS_EXCHANGE,
+  CHAT_EVENTS_EXCHANGE,
+  QUEUE_CHAT_EVENTS,
+  RK_MESSAGE_NEW,
+  RK_MESSAGE_EDIT,
+  RK_MESSAGE_DELETE,
+  RK_BOT_SEND_MESSAGE,
+  RK_BOT_EDIT_MESSAGE,
+  RK_BOT_DELETE_MESSAGE,
+  RK_BOT_CREATE_USER,
+  RK_BOT_GET_TOPIC_INFO,
+  RK_BOT_GET_TOPIC_MEMBERS,
+  RK_BOT_GET_USER_TOPICS,
+  RK_BOT_ADD_TO_TOPIC,
+  RK_BOT_REMOVE_FROM_TOPIC
+} from './rabbitmq.constants';
 
 @Injectable()
-export class ChatBridgeService implements OnModuleInit, OnModuleDestroy {
-  private wsClient: Socket;
-  private httpClient: AxiosInstance;
-  private chatServerUrl: string;
-  private serviceApiKey: string;
-  private systemUserJwt: string;
-
+export class ChatBridgeService implements OnModuleInit {
   // Registry: topicId → Set<botId (internal int)>
   private topicBotRegistry = new Map<string, Set<number>>();
   // Registry: botId → chatUserId (UUID)
@@ -24,131 +38,142 @@ export class ChatBridgeService implements OnModuleInit, OnModuleDestroy {
   constructor(
     private configService: ConfigService,
     private eventEmitter: EventEmitter2,
+    private amqp: AmqpConnection,
     private logger: LoggerService
-  ) {
-    this.chatServerUrl = this.configService.get<string>('chatServer.url') || 'http://localhost:3000';
-    this.serviceApiKey = this.configService.get<string>('chatServer.serviceApiKey') || '';
-    this.systemUserJwt = this.configService.get<string>('chatServer.systemUserJwt') || '';
-
-    this.httpClient = axios.create({
-      baseURL: this.chatServerUrl + '/api',
-      headers: {
-        'x-service-key': this.serviceApiKey,
-        'Content-Type': 'application/json'
-      },
-      timeout: 10000
-    });
-  }
+  ) {}
 
   async onModuleInit() {
-    this.connectWebSocket();
-  }
-
-  onModuleDestroy() {
-    if (this.wsClient) {
-      this.wsClient.disconnect();
-    }
+    this.logger.log('ChatBridge initialized with RabbitMQ', 'ChatBridge');
   }
 
   // ═══════════════════════════════════════════════════════════
-  //  WebSocket Connection — слушаем события от chat_server
+  //  RabbitMQ Subscribers — получение событий от chat_server
   // ═══════════════════════════════════════════════════════════
 
-  private connectWebSocket() {
-    if (!this.systemUserJwt) {
-      this.logger.warn('System user JWT not configured — WS bridge disabled', 'ChatBridge');
-      return;
-    }
-
-    this.wsClient = io(`${this.chatServerUrl}/chat`, {
-      auth: { token: this.systemUserJwt },
-      transports: ['websocket'],
-      reconnection: true,
-      reconnectionAttempts: Infinity,
-      reconnectionDelay: 3000
-    });
-
-    this.wsClient.on('connect', () => {
-      this.logger.log('WS connected to chat_server', 'ChatBridge');
-      this.joinBotTopics();
-    });
-
-    this.wsClient.on('disconnect', (reason) => {
-      this.logger.warn(`WS disconnected: ${reason}`, 'ChatBridge');
-    });
-
-    this.wsClient.on('connect_error', (err) => {
-      this.logger.error(new Error(`WS connection error: ${err.message}`), 'ChatBridge');
-    });
-
-    // Слушаем новые сообщения
-    this.wsClient.on('changeMessage', (payload: WsChangePayload<ChatMessage>) => {
-      this.handleChangeMessage(payload);
-    });
+  @RabbitSubscribe({
+    exchange: CHAT_EVENTS_EXCHANGE,
+    routingKey: RK_MESSAGE_NEW,
+    queue: QUEUE_CHAT_EVENTS + '.message_new'
+  })
+  handleMessageNew(payload: {
+    type: string;
+    topicId: string;
+    message: ChatMessage;
+    senderUserId: string;
+  }) {
+    this.dispatchToBot(payload.topicId, payload.message, 'message');
   }
 
-  private handleChangeMessage(payload: WsChangePayload<ChatMessage>) {
+  @RabbitSubscribe({
+    exchange: CHAT_EVENTS_EXCHANGE,
+    routingKey: RK_MESSAGE_EDIT,
+    queue: QUEUE_CHAT_EVENTS + '.message_edit'
+  })
+  handleMessageEdit(payload: {
+    type: string;
+    topicId: string;
+    message: ChatMessage;
+    senderUserId: string;
+  }) {
+    this.dispatchToBot(payload.topicId, payload.message, 'edited_message');
+  }
+
+  @RabbitSubscribe({
+    exchange: CHAT_EVENTS_EXCHANGE,
+    routingKey: RK_MESSAGE_DELETE,
+    queue: QUEUE_CHAT_EVENTS + '.message_delete'
+  })
+  handleMessageDelete(payload: {
+    type: string;
+    topicId: string;
+    message: { id: string; topicId: string };
+  }) {
+    // Для удаления просто уведомляем ботов
+    const botsInTopic = this.topicBotRegistry.get(payload.topicId);
+    if (!botsInTopic || botsInTopic.size === 0) return;
+
+    for (const botId of botsInTopic) {
+      this.eventEmitter.emit('bot.update', {
+        botId,
+        type: 'deleted_message',
+        payload: {
+          deleted_message: {
+            message_id: payload.message.id,
+            chat: { id: payload.topicId }
+          }
+        }
+      });
+    }
+  }
+
+  private dispatchToBot(
+    topicId: string,
+    message: ChatMessage,
+    updateType: string
+  ) {
     try {
-      const { type, topicId, data: message } = payload;
-
-      // Пропускаем не-NEW события (для updates нужны только новые сообщения)
-      // TODO: поддержать edited_message, на будущее
-      if (type !== 'NEW') return;
-
       // Пропускаем системные сообщения
       if (message.isSystem) return;
 
-      // Пропускаем сообщения от ботов (иначе бот получит свои же сообщения)
-      const senderUserId = message.senderUserId || (message as any).senderUser?.id;
+      // Пропускаем сообщения от ботов (иначе бот получит свои же)
+      const senderUserId =
+        message.senderUserId || (message as any).senderUser?.id;
       if (senderUserId && this.chatUserBotMap.has(senderUserId)) return;
 
       // Ищем ботов в этом топике
       const botsInTopic = this.topicBotRegistry.get(topicId);
       if (!botsInTopic || botsInTopic.size === 0) return;
 
-      // Для каждого бота создаём Update
       for (const botId of botsInTopic) {
-        const telegramStyleMessage = this.formatMessageToTelegramStyle(message, topicId);
+        const telegramStyleMessage = this.formatMessageToTelegramStyle(
+          message,
+          topicId
+        );
 
         this.eventEmitter.emit('bot.update', {
           botId,
-          type: 'message',
-          payload: { message: telegramStyleMessage }
+          type: updateType,
+          payload: { [updateType]: telegramStyleMessage }
         });
       }
     } catch (err) {
       this.logger.error(
         err instanceof Error ? err : new Error(String(err)),
-        'ChatBridge.handleChangeMessage'
+        'ChatBridge.dispatchToBot'
       );
     }
   }
 
   // ═══════════════════════════════════════════════════════════
-  //  REST — отправка сообщений через chat_server
+  //  RPC — отправка команд через RabbitMQ → chat_server
   // ═══════════════════════════════════════════════════════════
 
   async sendMessage(
     botId: number,
     topicId: string,
     text: string,
-    options?: { replyMessageId?: string; ex?: any; taggedUserIds?: string[] }
+    options?: {
+      replyMessageId?: string;
+      ex?: any;
+      taggedUserIds?: string[];
+    }
   ): Promise<ChatApiResponse<ChatMessage>> {
     const chatUserId = this.botChatUserMap.get(botId);
     if (!chatUserId) throw new Error(`Bot ${botId} not found in registry`);
 
-    const { data } = await this.httpClient.post<ChatApiResponse<ChatMessage>>(
-      '/internal/messages/send',
-      {
+    return this.amqp.request<ChatApiResponse<ChatMessage>>({
+      exchange: BOT_COMMANDS_EXCHANGE,
+      routingKey: RK_BOT_SEND_MESSAGE,
+      payload: {
         senderUserId: chatUserId,
         topicId,
         text,
         replyMessageId: options?.replyMessageId,
         ex: options?.ex,
         taggedUserIds: options?.taggedUserIds
-      }
-    );
-    return data;
+      },
+      timeout: 10000
+    });
   }
 
   async editMessage(
@@ -159,11 +184,12 @@ export class ChatBridgeService implements OnModuleInit, OnModuleDestroy {
     const chatUserId = this.botChatUserMap.get(botId);
     if (!chatUserId) throw new Error(`Bot ${botId} not found in registry`);
 
-    const { data } = await this.httpClient.post<ChatApiResponse<ChatMessage>>(
-      '/internal/messages/edit',
-      { senderUserId: chatUserId, messageId, text }
-    );
-    return data;
+    return this.amqp.request<ChatApiResponse<ChatMessage>>({
+      exchange: BOT_COMMANDS_EXCHANGE,
+      routingKey: RK_BOT_EDIT_MESSAGE,
+      payload: { senderUserId: chatUserId, messageId, text },
+      timeout: 10000
+    });
   }
 
   async deleteMessage(
@@ -174,76 +200,94 @@ export class ChatBridgeService implements OnModuleInit, OnModuleDestroy {
     const chatUserId = this.botChatUserMap.get(botId);
     if (!chatUserId) throw new Error(`Bot ${botId} not found in registry`);
 
-    const { data } = await this.httpClient.post<ChatApiResponse>(
-      '/internal/messages/delete',
-      { senderUserId: chatUserId, messageId, topicId }
-    );
-    return data;
+    return this.amqp.request<ChatApiResponse>({
+      exchange: BOT_COMMANDS_EXCHANGE,
+      routingKey: RK_BOT_DELETE_MESSAGE,
+      payload: { senderUserId: chatUserId, messageId, topicId },
+      timeout: 10000
+    });
   }
 
   // ═══════════════════════════════════════════════════════════
-  //  REST — управление пользователями-ботами
+  //  RPC — управление пользователями-ботами
   // ═══════════════════════════════════════════════════════════
 
-  async createBotUser(nickname: string, displayName: string): Promise<ChatUser> {
-    const { data } = await this.httpClient.post<ChatApiResponse<ChatUser>>(
-      '/internal/users/create-bot',
-      { nickname, displayName }
-    );
-    if (!data.ok) throw new Error(data.description || 'Failed to create bot user');
-    return data.result;
-  }
+  async createBotUser(
+    nickname: string,
+    displayName: string
+  ): Promise<ChatUser> {
+    const response = await this.amqp.request<ChatApiResponse<ChatUser>>({
+      exchange: BOT_COMMANDS_EXCHANGE,
+      routingKey: RK_BOT_CREATE_USER,
+      payload: { nickname, displayName },
+      timeout: 10000
+    });
 
-  async getUser(userId: string): Promise<ChatUser | null> {
-    try {
-      const { data } = await this.httpClient.get<ChatApiResponse<ChatUser>>(
-        `/internal/users/${userId}`
-      );
-      return data.ok ? data.result : null;
-    } catch {
-      return null;
-    }
+    if (!response.ok)
+      throw new Error((response as any).error || 'Failed to create bot user');
+    return response.result;
   }
 
   // ═══════════════════════════════════════════════════════════
-  //  REST — топики
+  //  RPC — топики
   // ═══════════════════════════════════════════════════════════
 
   async getTopicInfo(topicId: string): Promise<any> {
-    const { data } = await this.httpClient.get<ChatApiResponse>(
-      `/internal/topics/${topicId}`
-    );
-    return data.result;
+    const response = await this.amqp.request<ChatApiResponse>({
+      exchange: BOT_COMMANDS_EXCHANGE,
+      routingKey: RK_BOT_GET_TOPIC_INFO,
+      payload: { topicId },
+      timeout: 10000
+    });
+    return response.result;
   }
 
   async getTopicMembers(topicId: string): Promise<string[]> {
-    const { data } = await this.httpClient.get<ChatApiResponse<string[]>>(
-      `/internal/topics/${topicId}/members`
-    );
-    return data.result || [];
+    const response = await this.amqp.request<ChatApiResponse<string[]>>({
+      exchange: BOT_COMMANDS_EXCHANGE,
+      routingKey: RK_BOT_GET_TOPIC_MEMBERS,
+      payload: { topicId },
+      timeout: 10000
+    });
+    return response.result || [];
   }
 
   async getUserTopicIds(userId: string): Promise<string[]> {
-    const { data } = await this.httpClient.get<ChatApiResponse<string[]>>(
-      `/internal/topics/user/${userId}/topics`
-    );
-    return data.result || [];
+    const response = await this.amqp.request<ChatApiResponse<string[]>>({
+      exchange: BOT_COMMANDS_EXCHANGE,
+      routingKey: RK_BOT_GET_USER_TOPICS,
+      payload: { userId },
+      timeout: 10000
+    });
+    return response.result || [];
   }
 
-  async addBotToTopic(topicId: string, botUserId: string, actorId: string): Promise<boolean> {
-    const { data } = await this.httpClient.post<ChatApiResponse>(
-      `/internal/topics/${topicId}/add-bot`,
-      { botUserId, actorId }
-    );
-    return data.ok;
+  async addBotToTopic(
+    topicId: string,
+    botUserId: string,
+    actorId: string
+  ): Promise<boolean> {
+    const response = await this.amqp.request<ChatApiResponse>({
+      exchange: BOT_COMMANDS_EXCHANGE,
+      routingKey: RK_BOT_ADD_TO_TOPIC,
+      payload: { topicId, botUserId, actorId },
+      timeout: 10000
+    });
+    return response.ok;
   }
 
-  async removeBotFromTopic(topicId: string, botUserId: string, actorId: string): Promise<boolean> {
-    const { data } = await this.httpClient.post<ChatApiResponse>(
-      `/internal/topics/${topicId}/remove-bot`,
-      { botUserId, actorId }
-    );
-    return data.ok;
+  async removeBotFromTopic(
+    topicId: string,
+    botUserId: string,
+    actorId: string
+  ): Promise<boolean> {
+    const response = await this.amqp.request<ChatApiResponse>({
+      exchange: BOT_COMMANDS_EXCHANGE,
+      routingKey: RK_BOT_REMOVE_FROM_TOPIC,
+      payload: { topicId, botUserId, actorId },
+      timeout: 10000
+    });
+    return response.ok;
   }
 
   // ═══════════════════════════════════════════════════════════
@@ -262,7 +306,6 @@ export class ChatBridgeService implements OnModuleInit, OnModuleDestroy {
     }
     this.botChatUserMap.delete(botId);
 
-    // Remove from all topics
     for (const [topicId, bots] of this.topicBotRegistry) {
       bots.delete(botId);
       if (bots.size === 0) {
@@ -276,13 +319,6 @@ export class ChatBridgeService implements OnModuleInit, OnModuleDestroy {
       this.topicBotRegistry.set(topicId, new Set());
     }
     this.topicBotRegistry.get(topicId).add(botId);
-
-    // Join WS room
-    if (this.wsClient?.connected) {
-      // Socket.IO client не может join server rooms напрямую,
-      // но системный пользователь уже подписан на все свои room'ы через handleConnection
-      // Нужно будет добавить кастомное событие join или подписаться через REST
-    }
   }
 
   async loadBotTopics(botId: number, chatUserId: string) {
@@ -303,21 +339,14 @@ export class ChatBridgeService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private async joinBotTopics() {
-    // При подключении WS, подписываемся на все топики ботов
-    // Системный пользователь auto-join'ится на свои топики в handleConnection chat_server
-    // Но нужно, чтобы системный пользователь был участником всех нужных топиков
-    this.logger.log(
-      `Registry: ${this.botChatUserMap.size} bots, ${this.topicBotRegistry.size} topics`,
-      'ChatBridge'
-    );
-  }
-
   // ═══════════════════════════════════════════════════════════
   //  Helpers
   // ═══════════════════════════════════════════════════════════
 
-  private formatMessageToTelegramStyle(message: ChatMessage, topicId: string) {
+  private formatMessageToTelegramStyle(
+    message: ChatMessage,
+    topicId: string
+  ) {
     return {
       message_id: message.id,
       from: {
@@ -328,7 +357,7 @@ export class ChatBridgeService implements OnModuleInit, OnModuleDestroy {
       },
       chat: {
         id: topicId,
-        type: 'unknown' // будет обогащено позже если нужно
+        type: 'unknown'
       },
       date: Math.floor(new Date(message.createdAt).getTime() / 1000),
       text: message.text || '',

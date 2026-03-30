@@ -1,9 +1,19 @@
-import { HttpException, HttpStatus, Injectable, OnModuleInit } from '@nestjs/common';
+import {
+  HttpException,
+  HttpStatus,
+  Injectable,
+  OnModuleInit
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/sequelize';
 import { Bot } from './model/bots.model';
 import { ChatBridgeService } from '../chat-bridge/chat-bridge.service';
 import { ConfigService } from '@nestjs/config';
-import { createHash, randomBytes, createCipheriv, createDecipheriv } from 'crypto';
+import {
+  createHash,
+  randomBytes,
+  createCipheriv,
+  createDecipheriv
+} from 'crypto';
 import { LoggerService } from '../logger/logger.service';
 
 @Injectable()
@@ -22,7 +32,9 @@ export class BotsService implements OnModuleInit {
 
   async onModuleInit() {
     // При старте загружаем всех активных ботов в bridge registry
-    const bots = await this.botRepository.findAll({ where: { isActive: true } });
+    const bots = await this.botRepository.findAll({
+      where: { isActive: true }
+    });
     for (const bot of bots) {
       this.chatBridge.registerBot(bot.id, bot.chatUserId);
       // Загружаем топики бота асинхронно
@@ -35,11 +47,19 @@ export class BotsService implements OnModuleInit {
 
   // ─── Create ─────────────────────────────────────────────
 
-  async createBot(ownerUserId: string, username: string, displayName: string, description?: string): Promise<{ bot: Bot; token: string }> {
+  async createBot(
+    ownerUserId: string,
+    username: string,
+    displayName: string,
+    description?: string
+  ): Promise<{ bot: Bot; token: string }> {
     // Проверка уникальности username
     const existing = await this.botRepository.findOne({ where: { username } });
     if (existing) {
-      throw new HttpException('Бот с таким username уже существует', HttpStatus.CONFLICT);
+      throw new HttpException(
+        'Бот с таким username уже существует',
+        HttpStatus.CONFLICT
+      );
     }
 
     // 1. Создать пользователя-бота в chat_server
@@ -99,7 +119,15 @@ export class BotsService implements OnModuleInit {
 
   // ─── Webhook ────────────────────────────────────────────
 
-  async setWebhook(botId: number, config: { url: string; secret?: string; allowedUpdates?: string[]; maxConnections?: number }): Promise<void> {
+  async setWebhook(
+    botId: number,
+    config: {
+      url: string;
+      secret?: string;
+      allowedUpdates?: string[];
+      maxConnections?: number;
+    }
+  ): Promise<void> {
     await this.botRepository.update(
       { webhookConfig: config },
       { where: { id: botId } }
@@ -142,14 +170,18 @@ export class BotsService implements OnModuleInit {
   // ─── Activate/Deactivate ────────────────────────────────
 
   async deactivateBot(botId: number, ownerUserId: string): Promise<void> {
-    const bot = await this.botRepository.findOne({ where: { id: botId, ownerUserId } });
+    const bot = await this.botRepository.findOne({
+      where: { id: botId, ownerUserId }
+    });
     if (!bot) throw new HttpException('Бот не найден', HttpStatus.NOT_FOUND);
     await bot.update({ isActive: false });
     this.chatBridge.unregisterBot(botId);
   }
 
   async activateBot(botId: number, ownerUserId: string): Promise<void> {
-    const bot = await this.botRepository.findOne({ where: { id: botId, ownerUserId } });
+    const bot = await this.botRepository.findOne({
+      where: { id: botId, ownerUserId }
+    });
     if (!bot) throw new HttpException('Бот не найден', HttpStatus.NOT_FOUND);
     await bot.update({ isActive: true });
     this.chatBridge.registerBot(bot.id, bot.chatUserId);
@@ -166,7 +198,10 @@ export class BotsService implements OnModuleInit {
   private encryptToken(token: string): string {
     const iv = randomBytes(12);
     const cipher = createCipheriv('aes-256-gcm', this.encryptionKey, iv);
-    const encrypted = Buffer.concat([cipher.update(token, 'utf8'), cipher.final()]);
+    const encrypted = Buffer.concat([
+      cipher.update(token, 'utf8'),
+      cipher.final()
+    ]);
     const authTag = cipher.getAuthTag();
     return `${iv.toString('hex')}:${authTag.toString('hex')}:${encrypted.toString('hex')}`;
   }

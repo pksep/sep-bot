@@ -1,4 +1,13 @@
-import { Body, Controller, Get, Post, Param, Delete, UseGuards, ParseIntPipe } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Post,
+  Param,
+  Delete,
+  UseGuards,
+  ParseIntPipe
+} from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { BotsService } from './bots.service';
 import { CreateBotDto } from './dto/bots.dto';
@@ -50,21 +59,30 @@ export class BotsController {
 
   @ApiOperation({ summary: 'Перегенерировать API-токен бота' })
   @Post(':id/regenerate-token')
-  async regenerateToken(@UserId() userId: string, @Param('id', ParseIntPipe) id: number) {
+  async regenerateToken(
+    @UserId() userId: string,
+    @Param('id', ParseIntPipe) id: number
+  ) {
     const token = await this.botsService.regenerateToken(id, userId);
     return { ok: true, result: { token } };
   }
 
   @ApiOperation({ summary: 'Деактивировать бота' })
   @Post(':id/deactivate')
-  async deactivateBot(@UserId() userId: string, @Param('id', ParseIntPipe) id: number) {
+  async deactivateBot(
+    @UserId() userId: string,
+    @Param('id', ParseIntPipe) id: number
+  ) {
     await this.botsService.deactivateBot(id, userId);
     return { ok: true, result: true };
   }
 
   @ApiOperation({ summary: 'Активировать бота' })
   @Post(':id/activate')
-  async activateBot(@UserId() userId: string, @Param('id', ParseIntPipe) id: number) {
+  async activateBot(
+    @UserId() userId: string,
+    @Param('id', ParseIntPipe) id: number
+  ) {
     await this.botsService.activateBot(id, userId);
     return { ok: true, result: true };
   }
