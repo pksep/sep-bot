@@ -5,7 +5,7 @@ import {
   OnModuleInit
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/sequelize';
-import { Bot } from './model/bots.model';
+import { Bot, BotWebhookConfig } from './model/bots.model';
 import { ChatBridgeService } from '../chat-bridge/chat-bridge.service';
 import { ConfigService } from '@nestjs/config';
 import {
@@ -18,31 +18,39 @@ import { LoggerService } from '../logger/logger.service';
 
 @Injectable()
 export class BotsService implements OnModuleInit {
-  private encryptionKey: Buffer;
+  private readonly encryptionKey: Buffer;
 
   constructor(
-    @InjectModel(Bot) private botRepository: typeof Bot,
-    private chatBridge: ChatBridgeService,
-    private configService: ConfigService,
-    private logger: LoggerService
+    @InjectModel(Bot) private readonly botRepository: typeof Bot,
+    private readonly chatBridge: ChatBridgeService,
+    private readonly configService: ConfigService,
+    private readonly logger: LoggerService
   ) {
     const keyHex = this.configService.get<string>('botTokenEncryptionKey');
-    this.encryptionKey = keyHex ? Buffer.from(keyHex, 'hex') : randomBytes(32);
+    this.encryptionKey = keyHex
+      ? Buffer.from(keyHex, 'hex')
+      : randomBytes(32);
   }
 
-  async onModuleInit() {
-    // При старте загружаем всех активных ботов в bridge registry
+  async onModuleInit(): Promise<void> {
     const bots = await this.botRepository.findAll({
       where: { isActive: true }
     });
+
     for (const bot of bots) {
       this.chatBridge.registerBot(bot.id, bot.chatUserId);
-      // Загружаем топики бота асинхронно
       this.chatBridge.loadBotTopics(bot.id, bot.chatUserId).catch(err => {
-        this.logger.error(err, `BotsService.loadBotTopics(${bot.id})`);
+        this.logger.error(
+          err instanceof Error ? err : new Error(String(err)),
+          `BotsService.loadBotTopics(${bot.id})`
+        );
       });
     }
-    this.logger.log(`Loaded ${bots.length} bots into registry`, 'BotsService');
+
+    this.logger.log(
+      `Loaded ${bots.length} bots into registry`,
+      'BotsService'
+    );
   }
 
   // ─── Create ─────────────────────────────────────────────
@@ -53,8 +61,9 @@ export class BotsService implements OnModuleInit {
     displayName: string,
     description?: string
   ): Promise<{ bot: Bot; token: string }> {
-    // Проверка уникальности username
-    const existing = await this.botRepository.findOne({ where: { username } });
+    const existing = await this.botRepository.findOne({
+      where: { username }
+    });
     if (existing) {
       throw new HttpException(
         'Бот с таким username уже существует',
@@ -63,12 +72,15 @@ export class BotsService implements OnModuleInit {
     }
 
     // 1. Создать пользователя-бота в chat_server
-    const chatUser = await this.chatBridge.createBotUser(username, displayName);
+    const chatUser = await this.chatBridge.createBotUser(
+      username,
+      displayName
+    );
 
-    // 2. Создать запись бота
-    const rawToken = this.generateRawToken(0); // temporary, will update
-    const tokenHash = createHash('sha256').update(rawToken).digest('hex');
-    const encryptedToken = this.encryptToken(rawToken);
+    // 2. Создать запись бота (с временным токеном)
+    const tempToken = this.generateRawToken(0);
+    const tempHash = createHash('sha256').update(tempToken).digest('hex');
+    const tempEncrypted = this.encryptToken(tempToken);
 
     const bot = await this.botRepository.create({
       chatUserId: chatUser.id,
@@ -76,14 +88,16 @@ export class BotsService implements OnModuleInit {
       username,
       displayName,
       description,
-      apiToken: encryptedToken,
-      apiTokenHash: tokenHash,
+      apiToken: tempEncrypted,
+      apiTokenHash: tempHash,
       isActive: true
-    } as any);
+    });
 
     // 3. Перегенерировать токен с правильным botId
     const finalToken = this.generateRawToken(bot.id);
-    const finalHash = createHash('sha256').update(finalToken).digest('hex');
+    const finalHash = createHash('sha256')
+      .update(finalToken)
+      .digest('hex');
     const finalEncrypted = this.encryptToken(finalToken);
 
     await bot.update({
@@ -100,11 +114,12 @@ export class BotsService implements OnModuleInit {
   // ─── Token verification ─────────────────────────────────
 
   async verifyToken(rawToken: string): Promise<Bot | null> {
-    const tokenHash = createHash('sha256').update(rawToken).digest('hex');
-    const bot = await this.botRepository.findOne({
+    const tokenHash = createHash('sha256')
+      .update(rawToken)
+      .digest('hex');
+    return this.botRepository.findOne({
       where: { apiTokenHash: tokenHash, isActive: true }
     });
-    return bot || null;
   }
 
   // ─── Find ───────────────────────────────────────────────
@@ -121,12 +136,7 @@ export class BotsService implements OnModuleInit {
 
   async setWebhook(
     botId: number,
-    config: {
-      url: string;
-      secret?: string;
-      allowedUpdates?: string[];
-      maxConnections?: number;
-    }
+    config: BotWebhookConfig
   ): Promise<void> {
     await this.botRepository.update(
       { webhookConfig: config },
@@ -141,7 +151,9 @@ export class BotsService implements OnModuleInit {
     );
   }
 
-  async getWebhookInfo(botId: number): Promise<any> {
+  async getWebhookInfo(
+    botId: number
+  ): Promise<BotWebhookConfig | { url: string }> {
     const bot = await this.botRepository.findByPk(botId);
     if (!bot) return { url: '' };
     return bot.webhookConfig || { url: '' };
@@ -149,14 +161,15 @@ export class BotsService implements OnModuleInit {
 
   // ─── Token ──────────────────────────────────────────────
 
-  async regenerateToken(botId: number, ownerUserId: string): Promise<string> {
-    const bot = await this.botRepository.findOne({
-      where: { id: botId, ownerUserId }
-    });
-    if (!bot) throw new HttpException('Бот не найден', HttpStatus.NOT_FOUND);
-
+  async regenerateToken(
+    botId: number,
+    ownerUserId: string
+  ): Promise<string> {
+    const bot = await this.findOwnedBot(botId, ownerUserId);
     const rawToken = this.generateRawToken(bot.id);
-    const tokenHash = createHash('sha256').update(rawToken).digest('hex');
+    const tokenHash = createHash('sha256')
+      .update(rawToken)
+      .digest('hex');
     const encryptedToken = this.encryptToken(rawToken);
 
     await bot.update({
@@ -169,26 +182,39 @@ export class BotsService implements OnModuleInit {
 
   // ─── Activate/Deactivate ────────────────────────────────
 
-  async deactivateBot(botId: number, ownerUserId: string): Promise<void> {
-    const bot = await this.botRepository.findOne({
-      where: { id: botId, ownerUserId }
-    });
-    if (!bot) throw new HttpException('Бот не найден', HttpStatus.NOT_FOUND);
+  async deactivateBot(
+    botId: number,
+    ownerUserId: string
+  ): Promise<void> {
+    const bot = await this.findOwnedBot(botId, ownerUserId);
     await bot.update({ isActive: false });
     this.chatBridge.unregisterBot(botId);
   }
 
-  async activateBot(botId: number, ownerUserId: string): Promise<void> {
-    const bot = await this.botRepository.findOne({
-      where: { id: botId, ownerUserId }
-    });
-    if (!bot) throw new HttpException('Бот не найден', HttpStatus.NOT_FOUND);
+  async activateBot(
+    botId: number,
+    ownerUserId: string
+  ): Promise<void> {
+    const bot = await this.findOwnedBot(botId, ownerUserId);
     await bot.update({ isActive: true });
     this.chatBridge.registerBot(bot.id, bot.chatUserId);
     await this.chatBridge.loadBotTopics(bot.id, bot.chatUserId);
   }
 
-  // ─── Crypto helpers ─────────────────────────────────────
+  // ─── Private helpers ────────────────────────────────────
+
+  private async findOwnedBot(
+    botId: number,
+    ownerUserId: string
+  ): Promise<Bot> {
+    const bot = await this.botRepository.findOne({
+      where: { id: botId, ownerUserId }
+    });
+    if (!bot) {
+      throw new HttpException('Бот не найден', HttpStatus.NOT_FOUND);
+    }
+    return bot;
+  }
 
   private generateRawToken(botId: number): string {
     const secret = randomBytes(32).toString('hex');
@@ -203,16 +229,25 @@ export class BotsService implements OnModuleInit {
       cipher.final()
     ]);
     const authTag = cipher.getAuthTag();
-    return `${iv.toString('hex')}:${authTag.toString('hex')}:${encrypted.toString('hex')}`;
+    return [
+      iv.toString('hex'),
+      authTag.toString('hex'),
+      encrypted.toString('hex')
+    ].join(':');
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   private decryptToken(encrypted: string): string {
     const [ivHex, authTagHex, encryptedHex] = encrypted.split(':');
     const iv = Buffer.from(ivHex, 'hex');
     const authTag = Buffer.from(authTagHex, 'hex');
     const encryptedBuf = Buffer.from(encryptedHex, 'hex');
-    const decipher = createDecipheriv('aes-256-gcm', this.encryptionKey, iv);
+    const decipher = createDecipheriv(
+      'aes-256-gcm',
+      this.encryptionKey,
+      iv
+    );
     decipher.setAuthTag(authTag);
-    return decipher.update(encryptedBuf) + decipher.final('utf8');
+    return decipher.update(encryptedBuf).toString('utf8') + decipher.final('utf8');
   }
 }

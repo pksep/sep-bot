@@ -22,9 +22,11 @@ export class AllExceptionsFilter implements ExceptionFilter {
         ? exception.getStatus()
         : HttpStatus.INTERNAL_SERVER_ERROR;
 
+    const reqId = (req as Request & { id?: string }).id || 'unknown';
+
     this.logger.error(
       exception instanceof Error ? exception.message : 'Unknown error',
-      `HTTP ${req.method} ${req.url} reqId=${req.id}`
+      `HTTP ${req.method} ${req.url} reqId=${reqId}`
     );
 
     res.status(status).json({
@@ -33,7 +35,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
         exception instanceof HttpException
           ? exception.getResponse()
           : 'Internal server error',
-      reqId: req.id
+      reqId
     });
   }
 }
