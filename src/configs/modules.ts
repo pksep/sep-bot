@@ -12,17 +12,11 @@ import configFactory, { ConfigConstains } from './env.config';
 import { S3Module } from 'src/modules/s3/s3.module';
 import { redisStore } from 'cache-manager-redis-yet';
 import { AuthModule } from 'src/modules/auth/auth.module';
-import { UsersModule } from 'src/modules/users/users.module';
-import { ChatsModule } from 'src/modules/chats/chats.module';
-import { ChatMembersModule } from 'src/modules/chat-members/chat-members.module';
-import { MessagesModule } from 'src/modules/messages/messages.module';
-import { FilesModule } from 'src/modules/files/files.module';
+import { ChatBridgeModule } from 'src/modules/chat-bridge/chat-bridge.module';
 import { BotsModule } from 'src/modules/bots/bots.module';
 import { UpdatesModule } from 'src/modules/updates/updates.module';
-import { CallbackQueriesModule } from 'src/modules/callback-queries/callback-queries.module';
 import { BotApiModule } from 'src/modules/bot-api/bot-api.module';
 import { WebhooksModule } from 'src/modules/webhooks/webhooks.module';
-import { GatewayModule } from 'src/modules/gateway/gateway.module';
 
 export const getCoreModules = (): (
   | DynamicModule
@@ -66,9 +60,7 @@ export const getCoreModules = (): (
       );
       client.on('ready', () => console.log('Redis client is ready'));
 
-      return {
-        store
-      };
+      return { store };
     }
   }),
 
@@ -77,12 +69,7 @@ export const getCoreModules = (): (
     inject: [ConfigService],
     useFactory: (configService: ConfigService) => {
       const url = configService.get<string>(ConfigConstains.redisUrl);
-
-      return {
-        connection: {
-          url
-        }
-      };
+      return { connection: { url } };
     }
   }),
 
@@ -97,15 +84,9 @@ export const getCoreModules = (): (
 
 export const getAppModule = (): Type<any>[] => [
   AuthModule,
-  UsersModule,
-  ChatsModule,
-  ChatMembersModule,
-  MessagesModule,
-  FilesModule,
+  ChatBridgeModule,
   BotsModule,
   UpdatesModule,
-  CallbackQueriesModule,
   BotApiModule,
-  WebhooksModule,
-  GatewayModule
+  WebhooksModule
 ];

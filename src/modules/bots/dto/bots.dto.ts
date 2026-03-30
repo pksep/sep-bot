@@ -1,58 +1,22 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsArray, IsNotEmpty, IsNumber, IsOptional, IsString, IsUrl } from 'class-validator';
+import { IsString, IsOptional, MinLength, MaxLength, Matches } from 'class-validator';
 
 export class CreateBotDto {
-  @ApiProperty({ example: 'my_cool_bot' })
+  @ApiProperty({ example: 'weather_bot', description: 'Уникальный username бота' })
   @IsString()
-  @IsNotEmpty()
-  readonly username: string;
+  @MinLength(3)
+  @MaxLength(32)
+  @Matches(/^[a-z0-9_]+$/, { message: 'Username может содержать только a-z, 0-9, _' })
+  username: string;
 
-  @ApiProperty({ example: 'My Cool Bot' })
+  @ApiProperty({ example: 'Weather Bot', description: 'Отображаемое имя' })
   @IsString()
-  @IsNotEmpty()
-  readonly displayName: string;
+  @MinLength(1)
+  @MaxLength(64)
+  displayName: string;
 
-  @ApiProperty({ required: false })
-  @IsString()
-  @IsOptional()
-  readonly description?: string;
-}
-
-export class UpdateBotDto {
-  @ApiProperty({ required: false })
+  @ApiProperty({ example: 'Бот прогноза погоды', description: 'Описание', required: false })
   @IsString()
   @IsOptional()
-  readonly displayName?: string;
-
-  @ApiProperty({ required: false })
-  @IsString()
-  @IsOptional()
-  readonly description?: string;
-
-  @ApiProperty({ required: false })
-  @IsString()
-  @IsOptional()
-  readonly avatarUrl?: string;
-}
-
-export class SetWebhookDto {
-  @ApiProperty({ example: 'https://example.com/webhook' })
-  @IsUrl()
-  @IsNotEmpty()
-  readonly url: string;
-
-  @ApiProperty({ required: false })
-  @IsString()
-  @IsOptional()
-  readonly secret?: string;
-
-  @ApiProperty({ required: false, type: [String] })
-  @IsArray()
-  @IsOptional()
-  readonly allowed_updates?: string[];
-
-  @ApiProperty({ required: false })
-  @IsNumber()
-  @IsOptional()
-  readonly max_connections?: number;
+  description?: string;
 }

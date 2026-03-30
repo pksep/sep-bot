@@ -1,47 +1,38 @@
-import { Model, Column, DataType, Table, ForeignKey, BelongsTo } from 'sequelize-typescript';
-import { ApiProperty } from '@nestjs/swagger';
-import { User } from 'src/modules/users/model/users.model';
+import { Model, Column, DataType, Table } from 'sequelize-typescript';
 
 @Table({ tableName: 'bots', timestamps: true })
 export class Bot extends Model<Bot> {
-  @ApiProperty({ example: 1 })
   @Column({ type: DataType.INTEGER, unique: true, autoIncrement: true, primaryKey: true })
   id: number;
 
-  @ForeignKey(() => User)
-  @Column({ type: DataType.INTEGER, allowNull: false, field: 'owner_id' })
-  ownerId: number;
+  /** UUID пользователя-бота в chat_server */
+  @Column({ type: DataType.UUID, allowNull: false, unique: true, field: 'chat_user_id' })
+  chatUserId: string;
 
-  @BelongsTo(() => User, { foreignKey: 'owner_id', as: 'owner' })
-  owner: User;
+  /** UUID владельца бота (пользователь chat_server) */
+  @Column({ type: DataType.UUID, allowNull: false, field: 'owner_user_id' })
+  ownerUserId: string;
 
-  @ApiProperty({ example: 'my_cool_bot' })
-  @Column({ type: DataType.STRING, unique: true, allowNull: false })
+  @Column({ type: DataType.STRING, allowNull: false, unique: true })
   username: string;
 
-  @ApiProperty({ example: 'My Cool Bot' })
   @Column({ type: DataType.STRING, allowNull: false, field: 'display_name' })
   displayName: string;
 
-  @ApiProperty({ description: 'Описание бота' })
   @Column({ type: DataType.TEXT, allowNull: true })
   description: string;
 
-  @Column({ type: DataType.STRING, allowNull: true, field: 'avatar_url' })
-  avatarUrl: string;
-
-  // Зашифрованный AES-256-GCM токен
+  /** AES-256-GCM зашифрованный токен */
   @Column({ type: DataType.TEXT, allowNull: false, field: 'api_token' })
   apiToken: string;
 
-  // SHA-256 хеш для быстрого поиска по индексу
-  @Column({ type: DataType.STRING, unique: true, allowNull: false, field: 'api_token_hash' })
+  /** SHA-256 хеш токена для быстрого поиска */
+  @Column({ type: DataType.STRING, allowNull: false, unique: true, field: 'api_token_hash' })
   apiTokenHash: string;
 
   @Column({ type: DataType.BOOLEAN, defaultValue: true, field: 'is_active' })
   isActive: boolean;
 
-  @ApiProperty({ description: 'Конфигурация webhook' })
   @Column({ type: DataType.JSONB, allowNull: true, field: 'webhook_config' })
   webhookConfig: {
     url: string;

@@ -1,184 +1,183 @@
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable, OnModuleInit } from '@nestjs/common';
 import { InjectModel } from '@nestjs/sequelize';
 import { Bot } from './model/bots.model';
-import { CreateBotDto, SetWebhookDto, UpdateBotDto } from './dto/bots.dto';
-import { createHash, randomBytes, createCipheriv, createDecipheriv } from 'crypto';
+import { ChatBridgeService } from '../chat-bridge/chat-bridge.service';
 import { ConfigService } from '@nestjs/config';
-import { ConfigConstains } from 'src/configs/env.config';
+import { createHash, randomBytes, createCipheriv, createDecipheriv } from 'crypto';
 import { LoggerService } from '../logger/logger.service';
-import { User } from '../users/model/users.model';
 
 @Injectable()
-export class BotsService {
-  private readonly encryptionKey: Buffer;
+export class BotsService implements OnModuleInit {
+  private encryptionKey: Buffer;
 
   constructor(
     @InjectModel(Bot) private botRepository: typeof Bot,
+    private chatBridge: ChatBridgeService,
     private configService: ConfigService,
     private logger: LoggerService
   ) {
-    const key = this.configService.get<string>(ConfigConstains.botTokenEncryptionKey);
-    // Используем SHA-256 от ключа чтобы получить ровно 32 байта
-    this.encryptionKey = createHash('sha256').update(key || 'default-key').digest();
+    const keyHex = this.configService.get<string>('botTokenEncryptionKey');
+    this.encryptionKey = keyHex ? Buffer.from(keyHex, 'hex') : randomBytes(32);
   }
 
-  /**
-   * Генерирует токен формата: {botId}:{randomHex64}
-   */
+  async onModuleInit() {
+    // При старте загружаем всех активных ботов в bridge registry
+    const bots = await this.botRepository.findAll({ where: { isActive: true } });
+    for (const bot of bots) {
+      this.chatBridge.registerBot(bot.id, bot.chatUserId);
+      // Загружаем топики бота асинхронно
+      this.chatBridge.loadBotTopics(bot.id, bot.chatUserId).catch(err => {
+        this.logger.error(err, `BotsService.loadBotTopics(${bot.id})`);
+      });
+    }
+    this.logger.log(`Loaded ${bots.length} bots into registry`, 'BotsService');
+  }
+
+  // ─── Create ─────────────────────────────────────────────
+
+  async createBot(ownerUserId: string, username: string, displayName: string, description?: string): Promise<{ bot: Bot; token: string }> {
+    // Проверка уникальности username
+    const existing = await this.botRepository.findOne({ where: { username } });
+    if (existing) {
+      throw new HttpException('Бот с таким username уже существует', HttpStatus.CONFLICT);
+    }
+
+    // 1. Создать пользователя-бота в chat_server
+    const chatUser = await this.chatBridge.createBotUser(username, displayName);
+
+    // 2. Создать запись бота
+    const rawToken = this.generateRawToken(0); // temporary, will update
+    const tokenHash = createHash('sha256').update(rawToken).digest('hex');
+    const encryptedToken = this.encryptToken(rawToken);
+
+    const bot = await this.botRepository.create({
+      chatUserId: chatUser.id,
+      ownerUserId,
+      username,
+      displayName,
+      description,
+      apiToken: encryptedToken,
+      apiTokenHash: tokenHash,
+      isActive: true
+    } as any);
+
+    // 3. Перегенерировать токен с правильным botId
+    const finalToken = this.generateRawToken(bot.id);
+    const finalHash = createHash('sha256').update(finalToken).digest('hex');
+    const finalEncrypted = this.encryptToken(finalToken);
+
+    await bot.update({
+      apiToken: finalEncrypted,
+      apiTokenHash: finalHash
+    });
+
+    // 4. Зарегистрировать в bridge
+    this.chatBridge.registerBot(bot.id, chatUser.id);
+
+    return { bot, token: finalToken };
+  }
+
+  // ─── Token verification ─────────────────────────────────
+
+  async verifyToken(rawToken: string): Promise<Bot | null> {
+    const tokenHash = createHash('sha256').update(rawToken).digest('hex');
+    const bot = await this.botRepository.findOne({
+      where: { apiTokenHash: tokenHash, isActive: true }
+    });
+    return bot || null;
+  }
+
+  // ─── Find ───────────────────────────────────────────────
+
+  async findById(id: number): Promise<Bot | null> {
+    return this.botRepository.findByPk(id);
+  }
+
+  async findByOwner(ownerUserId: string): Promise<Bot[]> {
+    return this.botRepository.findAll({ where: { ownerUserId } });
+  }
+
+  // ─── Webhook ────────────────────────────────────────────
+
+  async setWebhook(botId: number, config: { url: string; secret?: string; allowedUpdates?: string[]; maxConnections?: number }): Promise<void> {
+    await this.botRepository.update(
+      { webhookConfig: config },
+      { where: { id: botId } }
+    );
+  }
+
+  async deleteWebhook(botId: number): Promise<void> {
+    await this.botRepository.update(
+      { webhookConfig: null },
+      { where: { id: botId } }
+    );
+  }
+
+  async getWebhookInfo(botId: number): Promise<any> {
+    const bot = await this.botRepository.findByPk(botId);
+    if (!bot) return { url: '' };
+    return bot.webhookConfig || { url: '' };
+  }
+
+  // ─── Token ──────────────────────────────────────────────
+
+  async regenerateToken(botId: number, ownerUserId: string): Promise<string> {
+    const bot = await this.botRepository.findOne({
+      where: { id: botId, ownerUserId }
+    });
+    if (!bot) throw new HttpException('Бот не найден', HttpStatus.NOT_FOUND);
+
+    const rawToken = this.generateRawToken(bot.id);
+    const tokenHash = createHash('sha256').update(rawToken).digest('hex');
+    const encryptedToken = this.encryptToken(rawToken);
+
+    await bot.update({
+      apiToken: encryptedToken,
+      apiTokenHash: tokenHash
+    });
+
+    return rawToken;
+  }
+
+  // ─── Activate/Deactivate ────────────────────────────────
+
+  async deactivateBot(botId: number, ownerUserId: string): Promise<void> {
+    const bot = await this.botRepository.findOne({ where: { id: botId, ownerUserId } });
+    if (!bot) throw new HttpException('Бот не найден', HttpStatus.NOT_FOUND);
+    await bot.update({ isActive: false });
+    this.chatBridge.unregisterBot(botId);
+  }
+
+  async activateBot(botId: number, ownerUserId: string): Promise<void> {
+    const bot = await this.botRepository.findOne({ where: { id: botId, ownerUserId } });
+    if (!bot) throw new HttpException('Бот не найден', HttpStatus.NOT_FOUND);
+    await bot.update({ isActive: true });
+    this.chatBridge.registerBot(bot.id, bot.chatUserId);
+    await this.chatBridge.loadBotTopics(bot.id, bot.chatUserId);
+  }
+
+  // ─── Crypto helpers ─────────────────────────────────────
+
   private generateRawToken(botId: number): string {
     const secret = randomBytes(32).toString('hex');
     return `${botId}:${secret}`;
   }
 
-  private hashToken(token: string): string {
-    return createHash('sha256').update(token).digest('hex');
-  }
-
   private encryptToken(token: string): string {
-    const iv = randomBytes(16);
+    const iv = randomBytes(12);
     const cipher = createCipheriv('aes-256-gcm', this.encryptionKey, iv);
-    let encrypted = cipher.update(token, 'utf8', 'hex');
-    encrypted += cipher.final('hex');
-    const authTag = cipher.getAuthTag().toString('hex');
-    return `${iv.toString('hex')}:${authTag}:${encrypted}`;
+    const encrypted = Buffer.concat([cipher.update(token, 'utf8'), cipher.final()]);
+    const authTag = cipher.getAuthTag();
+    return `${iv.toString('hex')}:${authTag.toString('hex')}:${encrypted.toString('hex')}`;
   }
 
-  private decryptToken(encryptedData: string): string {
-    const [ivHex, authTagHex, encrypted] = encryptedData.split(':');
+  private decryptToken(encrypted: string): string {
+    const [ivHex, authTagHex, encryptedHex] = encrypted.split(':');
     const iv = Buffer.from(ivHex, 'hex');
     const authTag = Buffer.from(authTagHex, 'hex');
+    const encryptedBuf = Buffer.from(encryptedHex, 'hex');
     const decipher = createDecipheriv('aes-256-gcm', this.encryptionKey, iv);
     decipher.setAuthTag(authTag);
-    let decrypted = decipher.update(encrypted, 'hex', 'utf8');
-    decrypted += decipher.final('utf8');
-    return decrypted;
-  }
-
-  async createBot(dto: CreateBotDto, ownerId: number): Promise<{ bot: Bot; token: string }> {
-    const existing = await this.botRepository.findOne({ where: { username: dto.username } });
-    if (existing) {
-      throw new HttpException('Бот с таким username уже существует', HttpStatus.CONFLICT);
-    }
-
-    // Создаём бота сначала с placeholder токеном
-    const bot = await this.botRepository.create({
-      ownerId,
-      username: dto.username,
-      displayName: dto.displayName,
-      description: dto.description,
-      apiToken: 'placeholder',
-      apiTokenHash: 'placeholder'
-    } as any);
-
-    // Генерируем реальный токен с botId
-    const rawToken = this.generateRawToken(bot.id);
-    const tokenHash = this.hashToken(rawToken);
-    const encryptedToken = this.encryptToken(rawToken);
-
-    await bot.update({
-      apiToken: encryptedToken,
-      apiTokenHash: tokenHash
-    });
-
-    return { bot, token: rawToken };
-  }
-
-  async regenerateToken(botId: number, ownerId: number): Promise<{ token: string }> {
-    const bot = await this.botRepository.findOne({ where: { id: botId, ownerId } });
-    if (!bot) throw new HttpException('Бот не найден', HttpStatus.NOT_FOUND);
-
-    const rawToken = this.generateRawToken(bot.id);
-    const tokenHash = this.hashToken(rawToken);
-    const encryptedToken = this.encryptToken(rawToken);
-
-    await bot.update({
-      apiToken: encryptedToken,
-      apiTokenHash: tokenHash
-    });
-
-    return { token: rawToken };
-  }
-
-  /**
-   * Верификация токена из Bot API запроса.
-   * 1. Парсим botId из первой части токена
-   * 2. Вычисляем SHA-256(token)
-   * 3. Ищем бота по id + hash
-   */
-  async verifyToken(token: string): Promise<Bot | null> {
-    try {
-      const parts = token.split(':');
-      if (parts.length !== 2) return null;
-
-      const botId = parseInt(parts[0], 10);
-      if (isNaN(botId)) return null;
-
-      const tokenHash = this.hashToken(token);
-
-      const bot = await this.botRepository.findOne({
-        where: { id: botId, apiTokenHash: tokenHash, isActive: true }
-      });
-
-      return bot;
-    } catch (error) {
-      this.logger.error(error instanceof Error ? error : new Error(String(error)), BotsService.name);
-      return null;
-    }
-  }
-
-  async findById(id: number): Promise<Bot> {
-    const bot = await this.botRepository.findByPk(id, {
-      attributes: { exclude: ['apiToken', 'apiTokenHash'] },
-      include: [{ model: User, as: 'owner', attributes: ['id', 'username'] }]
-    });
-    if (!bot) throw new HttpException('Бот не найден', HttpStatus.NOT_FOUND);
-    return bot;
-  }
-
-  async getUserBots(ownerId: number): Promise<Bot[]> {
-    return this.botRepository.findAll({
-      where: { ownerId },
-      attributes: { exclude: ['apiToken', 'apiTokenHash'] }
-    });
-  }
-
-  async updateBot(botId: number, ownerId: number, dto: UpdateBotDto): Promise<Bot> {
-    const bot = await this.botRepository.findOne({ where: { id: botId, ownerId } });
-    if (!bot) throw new HttpException('Бот не найден', HttpStatus.NOT_FOUND);
-    await bot.update(dto);
-    return this.findById(bot.id);
-  }
-
-  async deactivateBot(botId: number, ownerId: number): Promise<void> {
-    const bot = await this.botRepository.findOne({ where: { id: botId, ownerId } });
-    if (!bot) throw new HttpException('Бот не найден', HttpStatus.NOT_FOUND);
-    await bot.update({ isActive: false });
-  }
-
-  async setWebhook(botId: number, dto: SetWebhookDto): Promise<boolean> {
-    const bot = await this.botRepository.findByPk(botId);
-    if (!bot) throw new HttpException('Бот не найден', HttpStatus.NOT_FOUND);
-    await bot.update({
-      webhookConfig: {
-        url: dto.url,
-        secret: dto.secret,
-        allowedUpdates: dto.allowed_updates,
-        maxConnections: dto.max_connections
-      }
-    });
-    return true;
-  }
-
-  async deleteWebhook(botId: number): Promise<boolean> {
-    const bot = await this.botRepository.findByPk(botId);
-    if (!bot) throw new HttpException('Бот не найден', HttpStatus.NOT_FOUND);
-    await bot.update({ webhookConfig: null });
-    return true;
-  }
-
-  async getWebhookInfo(botId: number): Promise<object> {
-    const bot = await this.botRepository.findByPk(botId);
-    if (!bot) throw new HttpException('Бот не найден', HttpStatus.NOT_FOUND);
-    return bot.webhookConfig || { url: '', has_custom_certificate: false, pending_update_count: 0 };
+    return decipher.update(encryptedBuf) + decipher.final('utf8');
   }
 }

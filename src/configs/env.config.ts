@@ -1,4 +1,4 @@
-import { generateObjectPath } from '../utils/extensions/objects';
+import { generateObjectPath } from 'src/utils/extensions/objects';
 
 export type ConfigType = ReturnType<typeof configFactory>;
 
@@ -12,8 +12,13 @@ export default function configFactory() {
     },
     privateKey: process.env.PRIVATE_KEY!,
     redisUrl: process.env.REDIS_URL!,
-    adminPassword: process.env.ADMIN_PASSWORD!,
-    applicationType: process.env.APPLICATION_TYPE!,
+    jwtSecret: process.env.JWT_SECRET!,
+    botTokenEncryptionKey: process.env.BOT_TOKEN_ENCRYPTION_KEY!,
+    chatServer: {
+      url: process.env.CHAT_SERVER_URL || 'http://localhost:3000',
+      serviceApiKey: process.env.CHAT_SERVER_SERVICE_API_KEY!,
+      systemUserJwt: process.env.CHAT_SERVER_SYSTEM_USER_JWT!
+    },
     minio: {
       user: process.env.MINIO_ROOT_USER!,
       password: process.env.MINIO_ROOT_PASSWORD!,
@@ -22,13 +27,7 @@ export default function configFactory() {
       port: process.env.MINIO_PORT!,
       ssl: process.env.MINIO_USE_SSL!,
       publicBaseUrl: process.env.MINIO_PUBLIC_BASE_URL!,
-      isPathStyle: process.env.MINIO_PATH_STYLE!,
-      localBaseUrl: process.env.MINIO_LOCAL_BASE_URL!
-    },
-    botTokenEncryptionKey: process.env.BOT_TOKEN_ENCRYPTION_KEY!,
-    webhookDelivery: {
-      maxRetries: Number(process.env.WEBHOOK_MAX_RETRIES) || 3,
-      retryDelay: Number(process.env.WEBHOOK_RETRY_DELAY) || 5000
+      isPathStyle: process.env.MINIO_PATH_STYLE!
     }
   } as const;
 }
