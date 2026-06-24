@@ -1,9 +1,4 @@
-import {
-  HttpException,
-  Injectable,
-  HttpStatus,
-  UnauthorizedException
-} from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { IUserDataToken } from './interfaces/interface';
 import { Response } from 'express';

@@ -3,7 +3,7 @@
  */
 
 export interface ChatUser {
-  id: string;       // UUID
+  id: string; // UUID
   initials: string;
   nickname: string;
   avatarUrl?: string;
@@ -13,13 +13,13 @@ export interface ChatUser {
 }
 
 export interface ChatTopic {
-  id: string;       // UUID
+  id: string; // UUID
   type: 'GROUP' | 'DM';
   createdAt: Date;
 }
 
 export interface ChatMessage {
-  id: string;       // UUID
+  id: string; // UUID
   senderUserId: string;
   topicId: string;
   text?: string;

@@ -63,3 +63,8 @@ source/
 .compose-data
 .qodo
 
+
+# e2e / throwaway — не коммитим в публичный репо
+*.pre-e2e.bak
+seed_bot.js
+seed_topic.sql

@@ -23,7 +23,8 @@ export const getCoreModules = (): (
   | Promise<DynamicModule>
 )[] => [
   DevtoolsModule.register({
-    http: process.env.NODE_ENV !== 'production'
+    http: process.env.NODE_ENV !== 'production',
+    port: Number(process.env.DEVTOOLS_PORT) || 8001
   }),
 
   ConfigModule.forRoot({

@@ -21,7 +21,8 @@ export class WebhookProcessor extends WorkerHost {
   }
 
   async process(job: Job<WebhookJobData>): Promise<void> {
-    const { webhookUrl, webhookSecret, payload, botId, updateId, attempt } = job.data;
+    const { webhookUrl, webhookSecret, payload, botId, updateId, attempt } =
+      job.data;
 
     try {
       const headers: Record<string, string> = {

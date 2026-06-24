@@ -27,6 +27,24 @@ interface DeleteMessageParams {
   message_id: string;
 }
 
+interface GetUploadUrlParams {
+  file_name: string;
+  mime_type?: string;
+}
+
+interface SendDocumentParams {
+  chat_id: string;
+  /** objectName, полученный из getUploadUrl */
+  file_id: string;
+  file_name: string;
+  file_size: number;
+  mime_type?: string;
+  thumbnail_path?: string;
+  type?: 'IMAGE' | 'VIDEO' | 'FILE';
+  caption?: string;
+  reply_to_message_id?: string;
+}
+
 interface GetUpdatesParams {
   offset?: number;
   limit?: number;
@@ -43,6 +61,14 @@ interface ChatIdParam {
   chat_id: string;
 }
 
+interface FormattedMedia {
+  path: string;
+  thumbnail_path?: string;
+  origin_name: string;
+  size: number;
+  type: string;
+}
+
 interface FormattedMessage {
   message_id: string;
   from: { id: string; is_bot: boolean };
@@ -50,6 +76,7 @@ interface FormattedMessage {
   date: number;
   text: string;
   reply_to_message?: { message_id: string };
+  media?: FormattedMedia[];
 }
 
 // ─── Service ─────────────────────────────────────────────
@@ -142,6 +169,71 @@ export class BotApiService {
     }
   }
 
+  // ─── Files ────────────────────────────────────────────
+
+  /**
+   * Выдать presigned-URL для прямой загрузки файла в MinIO.
+   * SDK льёт файл по `upload_url`, затем зовёт sendDocument с `file_id`.
+   */
+  async getUploadUrl(
+    _bot: Bot,
+    params: GetUploadUrlParams
+  ): Promise<ITelegramApiResponse> {
+    try {
+      const r = await this.chatBridge.getUploadUrl(
+        params.file_name,
+        params.mime_type
+      );
+      return this.ok({
+        file_id: r.objectName,
+        upload_url: r.uploadUrl,
+        public_url: r.publicUrl
+      });
+    } catch (err: unknown) {
+      return this.error(400, this.getErrorMessage(err));
+    }
+  }
+
+  /**
+   * Отправить сообщение с уже загруженным файлом (см. getUploadUrl).
+   * Через шину уходит только метаданные (path/size/type), не байты.
+   */
+  async sendDocument(
+    bot: Bot,
+    params: SendDocumentParams
+  ): Promise<ITelegramApiResponse> {
+    try {
+      const type = params.type ?? this.mediaTypeFromMime(params.mime_type);
+      const result = await this.chatBridge.sendMessage(
+        bot.id,
+        params.chat_id,
+        params.caption ?? '',
+        {
+          replyMessageId: params.reply_to_message_id,
+          medias: [
+            {
+              path: params.file_id,
+              thumbnailPath: params.thumbnail_path ?? params.file_id,
+              originName: params.file_name,
+              size: params.file_size,
+              type
+            }
+          ]
+        }
+      );
+      return this.ok(this.formatMessage(result.result));
+    } catch (err: unknown) {
+      return this.error(400, this.getErrorMessage(err));
+    }
+  }
+
+  private mediaTypeFromMime(mime?: string): 'IMAGE' | 'VIDEO' | 'FILE' {
+    if (!mime) return 'FILE';
+    if (mime.startsWith('image/')) return 'IMAGE';
+    if (mime.startsWith('video/')) return 'VIDEO';
+    return 'FILE';
+  }
+
   // ─── Updates ──────────────────────────────────────────
 
   async getUpdates(
@@ -196,10 +288,7 @@ export class BotApiService {
 
   // ─── Chats ────────────────────────────────────────────
 
-  async getChat(
-    bot: Bot,
-    params: ChatIdParam
-  ): Promise<ITelegramApiResponse> {
+  async getChat(bot: Bot, params: ChatIdParam): Promise<ITelegramApiResponse> {
     try {
       const topic = await this.chatBridge.getTopicInfo(params.chat_id);
       return this.ok({
@@ -225,9 +314,7 @@ export class BotApiService {
 
   // ─── Helpers ──────────────────────────────────────────
 
-  private formatMessage(
-    msg: ChatMessage | undefined
-  ): FormattedMessage | null {
+  private formatMessage(msg: ChatMessage | undefined): FormattedMessage | null {
     if (!msg) return null;
     return {
       message_id: msg.id,
@@ -240,6 +327,19 @@ export class BotApiService {
       text: msg.text || '',
       ...(msg.replyMessageId
         ? { reply_to_message: { message_id: msg.replyMessageId } }
+        : {}),
+      ...(Array.isArray((msg as any).media) && (msg as any).media.length
+        ? {
+            media: (msg as any).media.map(
+              (m: any): FormattedMedia => ({
+                path: m.path,
+                thumbnail_path: m.thumbnailPath,
+                origin_name: m.originName,
+                size: Number(m.size),
+                type: m.type
+              })
+            )
+          }
         : {})
     };
   }

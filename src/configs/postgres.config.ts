@@ -33,9 +33,7 @@ export const getSequelizeConfig = ({
       dialectOptions: {
         connectTimeout: 60000
       },
-      logging: !logging
-        ? false
-        : process.env.NODE_ENV !== 'test',
+      logging: !logging ? false : process.env.NODE_ENV !== 'test',
       models: models,
       autoLoadModels: false,
       pool: {

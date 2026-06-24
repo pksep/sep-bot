@@ -4,8 +4,8 @@ import {
   Get,
   Post,
   Param,
-  Delete,
-  UseGuards,
+  Headers,
+  BadRequestException,
   ParseIntPipe
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
@@ -21,9 +21,21 @@ export class BotsController {
 
   @ApiOperation({ summary: 'Создать нового бота' })
   @Post()
-  async createBot(@UserId() userId: string, @Body() dto: CreateBotDto) {
+  async createBot(
+    @UserId() userId: string,
+    @Headers('x-owner-id') ownerHeader: string,
+    @Body() dto: CreateBotDto
+  ) {
+    // В проде владелец берётся из JWT (req.user). Для локального dev-режима,
+    // где гард пропускает запрос без user, владельца передаёт клиент в X-Owner-Id.
+    const ownerUserId = userId || ownerHeader;
+    if (!ownerUserId) {
+      throw new BadRequestException(
+        'Не удалось определить владельца бота: нет авторизации и заголовка X-Owner-Id'
+      );
+    }
     const { bot, token } = await this.botsService.createBot(
-      userId,
+      ownerUserId,
       dto.username,
       dto.displayName,
       dto.description
@@ -32,6 +44,7 @@ export class BotsController {
       ok: true,
       result: {
         id: bot.id,
+        chat_user_id: bot.chatUserId,
         username: bot.username,
         display_name: bot.displayName,
         description: bot.description,

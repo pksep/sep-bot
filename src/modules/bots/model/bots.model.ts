@@ -1,4 +1,11 @@
-import { Model, Column, DataType, Table, CreatedAt, UpdatedAt } from 'sequelize-typescript';
+import {
+  Model,
+  Column,
+  DataType,
+  Table,
+  CreatedAt,
+  UpdatedAt
+} from 'sequelize-typescript';
 
 export interface BotWebhookConfig {
   url: string;

@@ -62,6 +62,55 @@ export class BotApiController {
     return this.botApiService.deleteMessage(bot, body);
   }
 
+  // ─── Files ────────────────────────────────────────────
+  @ApiOperation({ summary: 'getUploadUrl — presigned-URL для загрузки файла' })
+  @Post('getUploadUrl')
+  getUploadUrl(
+    @CurrentBot() bot: Bot,
+    @Body() body: { file_name: string; mime_type?: string }
+  ) {
+    return this.botApiService.getUploadUrl(bot, body);
+  }
+
+  @ApiOperation({ summary: 'sendDocument — отправить файл (по file_id)' })
+  @Post('sendDocument')
+  sendDocument(
+    @CurrentBot() bot: Bot,
+    @Body()
+    body: {
+      chat_id: string;
+      file_id: string;
+      file_name: string;
+      file_size: number;
+      mime_type?: string;
+      thumbnail_path?: string;
+      type?: 'IMAGE' | 'VIDEO' | 'FILE';
+      caption?: string;
+      reply_to_message_id?: string;
+    }
+  ) {
+    return this.botApiService.sendDocument(bot, body);
+  }
+
+  @ApiOperation({ summary: 'sendPhoto — отправить изображение (по file_id)' })
+  @Post('sendPhoto')
+  sendPhoto(
+    @CurrentBot() bot: Bot,
+    @Body()
+    body: {
+      chat_id: string;
+      file_id: string;
+      file_name: string;
+      file_size: number;
+      mime_type?: string;
+      thumbnail_path?: string;
+      caption?: string;
+      reply_to_message_id?: string;
+    }
+  ) {
+    return this.botApiService.sendDocument(bot, { ...body, type: 'IMAGE' });
+  }
+
   // ─── Updates ──────────────────────────────────────────
   @ApiOperation({ summary: 'getUpdates — long polling обновлений' })
   @Post('getUpdates')

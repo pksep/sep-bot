@@ -5,10 +5,7 @@ import { WebhooksService } from './webhooks.service';
 import { BotsModule } from '../bots/bots.module';
 
 @Module({
-  imports: [
-    BullModule.registerQueue({ name: 'webhook-delivery' }),
-    BotsModule
-  ],
+  imports: [BullModule.registerQueue({ name: 'webhook-delivery' }), BotsModule],
   providers: [WebhookProcessor, WebhooksService],
   exports: [WebhooksService]
 })

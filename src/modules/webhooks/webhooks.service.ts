@@ -13,7 +13,11 @@ export class WebhooksService {
     private logger: LoggerService
   ) {}
 
-  async enqueueDelivery(botId: number, updateId: number, payload: object): Promise<void> {
+  async enqueueDelivery(
+    botId: number,
+    updateId: number,
+    payload: object
+  ): Promise<void> {
     try {
       const bot = await this.botsService.findById(botId);
       const webhookConfig = bot?.webhookConfig as any;

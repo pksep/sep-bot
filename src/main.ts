@@ -74,9 +74,9 @@ import { AllExceptionsFilter } from './modules/logger/filters/all-exceptions.fil
   const portRun = configService.get(ConfigConstains.port);
 
   const config = new DocumentBuilder()
-    .setTitle('Chat Bot API')
+    .setTitle('Сеп-бот / Sep-bot API')
     .setDescription(
-      'Custom Chat Bot API Platform — аналог Telegram Bot API для собственного чата'
+      'Сеп-бот — шлюз ботов для sep-chat. Telegram-style Bot API поверх RabbitMQ-моста к chat_server'
     )
     .setVersion('1.0.0')
     .addCookieAuth(

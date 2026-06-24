@@ -15,8 +15,7 @@ import {
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
         uri:
-          configService.get<string>('rabbitmqUrl') ||
-          'amqp://localhost:5672',
+          configService.get<string>('rabbitmqUrl') || 'amqp://localhost:5672',
         exchanges: [
           {
             name: CHAT_EVENTS_EXCHANGE,

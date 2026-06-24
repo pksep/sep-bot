@@ -24,11 +24,7 @@ export class UpdatesService {
    */
   @OnEvent('bot.update')
   async handleBotUpdate(data: BotUpdateEvent): Promise<void> {
-    const update = await this.createUpdate(
-      data.botId,
-      data.type,
-      data.payload
-    );
+    const update = await this.createUpdate(data.botId, data.type, data.payload);
 
     await this.webhooksService.enqueueDelivery(data.botId, update.id, {
       update_id: update.id,
@@ -59,7 +55,10 @@ export class UpdatesService {
   ): Promise<Update[]> {
     const where: WhereOptions<Update> = { botId };
     if (offset) {
-      (where as Record<string, unknown>).id = { [Op.gt]: offset };
+      // Telegram-конвенция: клиент шлёт offset = последний update_id + 1 и ждёт
+      // update_id >= offset. Поэтому здесь Op.gte, а НЕ Op.gt — иначе пропускается
+      // ровно каждое второе сообщение (offset=max+1, а gt:max+1 скипает max+1).
+      (where as Record<string, unknown>).id = { [Op.gte]: offset };
     }
 
     const queryOptions = {

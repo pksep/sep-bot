@@ -27,9 +27,7 @@ export class BotsService implements OnModuleInit {
     private readonly logger: LoggerService
   ) {
     const keyHex = this.configService.get<string>('botTokenEncryptionKey');
-    this.encryptionKey = keyHex
-      ? Buffer.from(keyHex, 'hex')
-      : randomBytes(32);
+    this.encryptionKey = keyHex ? Buffer.from(keyHex, 'hex') : randomBytes(32);
   }
 
   async onModuleInit(): Promise<void> {
@@ -47,10 +45,7 @@ export class BotsService implements OnModuleInit {
       });
     }
 
-    this.logger.log(
-      `Loaded ${bots.length} bots into registry`,
-      'BotsService'
-    );
+    this.logger.log(`Loaded ${bots.length} bots into registry`, 'BotsService');
   }
 
   // ─── Create ─────────────────────────────────────────────
@@ -72,10 +67,7 @@ export class BotsService implements OnModuleInit {
     }
 
     // 1. Создать пользователя-бота в chat_server
-    const chatUser = await this.chatBridge.createBotUser(
-      username,
-      displayName
-    );
+    const chatUser = await this.chatBridge.createBotUser(username, displayName);
 
     // 2. Создать запись бота (с временным токеном)
     const tempToken = this.generateRawToken(0);
@@ -95,9 +87,7 @@ export class BotsService implements OnModuleInit {
 
     // 3. Перегенерировать токен с правильным botId
     const finalToken = this.generateRawToken(bot.id);
-    const finalHash = createHash('sha256')
-      .update(finalToken)
-      .digest('hex');
+    const finalHash = createHash('sha256').update(finalToken).digest('hex');
     const finalEncrypted = this.encryptToken(finalToken);
 
     await bot.update({
@@ -114,9 +104,7 @@ export class BotsService implements OnModuleInit {
   // ─── Token verification ─────────────────────────────────
 
   async verifyToken(rawToken: string): Promise<Bot | null> {
-    const tokenHash = createHash('sha256')
-      .update(rawToken)
-      .digest('hex');
+    const tokenHash = createHash('sha256').update(rawToken).digest('hex');
     return this.botRepository.findOne({
       where: { apiTokenHash: tokenHash, isActive: true }
     });
@@ -134,10 +122,7 @@ export class BotsService implements OnModuleInit {
 
   // ─── Webhook ────────────────────────────────────────────
 
-  async setWebhook(
-    botId: number,
-    config: BotWebhookConfig
-  ): Promise<void> {
+  async setWebhook(botId: number, config: BotWebhookConfig): Promise<void> {
     await this.botRepository.update(
       { webhookConfig: config },
       { where: { id: botId } }
@@ -161,15 +146,10 @@ export class BotsService implements OnModuleInit {
 
   // ─── Token ──────────────────────────────────────────────
 
-  async regenerateToken(
-    botId: number,
-    ownerUserId: string
-  ): Promise<string> {
+  async regenerateToken(botId: number, ownerUserId: string): Promise<string> {
     const bot = await this.findOwnedBot(botId, ownerUserId);
     const rawToken = this.generateRawToken(bot.id);
-    const tokenHash = createHash('sha256')
-      .update(rawToken)
-      .digest('hex');
+    const tokenHash = createHash('sha256').update(rawToken).digest('hex');
     const encryptedToken = this.encryptToken(rawToken);
 
     await bot.update({
@@ -182,19 +162,13 @@ export class BotsService implements OnModuleInit {
 
   // ─── Activate/Deactivate ────────────────────────────────
 
-  async deactivateBot(
-    botId: number,
-    ownerUserId: string
-  ): Promise<void> {
+  async deactivateBot(botId: number, ownerUserId: string): Promise<void> {
     const bot = await this.findOwnedBot(botId, ownerUserId);
     await bot.update({ isActive: false });
     this.chatBridge.unregisterBot(botId);
   }
 
-  async activateBot(
-    botId: number,
-    ownerUserId: string
-  ): Promise<void> {
+  async activateBot(botId: number, ownerUserId: string): Promise<void> {
     const bot = await this.findOwnedBot(botId, ownerUserId);
     await bot.update({ isActive: true });
     this.chatBridge.registerBot(bot.id, bot.chatUserId);
@@ -203,10 +177,7 @@ export class BotsService implements OnModuleInit {
 
   // ─── Private helpers ────────────────────────────────────
 
-  private async findOwnedBot(
-    botId: number,
-    ownerUserId: string
-  ): Promise<Bot> {
+  private async findOwnedBot(botId: number, ownerUserId: string): Promise<Bot> {
     const bot = await this.botRepository.findOne({
       where: { id: botId, ownerUserId }
     });
@@ -242,12 +213,10 @@ export class BotsService implements OnModuleInit {
     const iv = Buffer.from(ivHex, 'hex');
     const authTag = Buffer.from(authTagHex, 'hex');
     const encryptedBuf = Buffer.from(encryptedHex, 'hex');
-    const decipher = createDecipheriv(
-      'aes-256-gcm',
-      this.encryptionKey,
-      iv
-    );
+    const decipher = createDecipheriv('aes-256-gcm', this.encryptionKey, iv);
     decipher.setAuthTag(authTag);
-    return decipher.update(encryptedBuf).toString('utf8') + decipher.final('utf8');
+    return (
+      decipher.update(encryptedBuf).toString('utf8') + decipher.final('utf8')
+    );
   }
 }

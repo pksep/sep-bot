@@ -23,7 +23,10 @@ import {
   RK_BOT_GET_TOPIC_MEMBERS,
   RK_BOT_GET_USER_TOPICS,
   RK_BOT_ADD_TO_TOPIC,
-  RK_BOT_REMOVE_FROM_TOPIC
+  RK_BOT_REMOVE_FROM_TOPIC,
+  RK_BOT_GET_UPLOAD_URL,
+  type BotMedia,
+  type GetUploadUrlResult
 } from './rabbitmq.constants';
 
 @Injectable()
@@ -55,13 +58,13 @@ export class ChatBridgeService implements OnModuleInit {
     routingKey: RK_MESSAGE_NEW,
     queue: QUEUE_CHAT_EVENTS + '.message_new'
   })
-  handleMessageNew(payload: {
+  async handleMessageNew(payload: {
     type: string;
     topicId: string;
     message: ChatMessage;
     senderUserId: string;
   }) {
-    this.dispatchToBot(payload.topicId, payload.message, 'message');
+    await this.dispatchToBot(payload.topicId, payload.message, 'message');
   }
 
   @RabbitSubscribe({
@@ -75,7 +78,7 @@ export class ChatBridgeService implements OnModuleInit {
     message: ChatMessage;
     senderUserId: string;
   }) {
-    this.dispatchToBot(payload.topicId, payload.message, 'edited_message');
+    void this.dispatchToBot(payload.topicId, payload.message, 'edited_message');
   }
 
   @RabbitSubscribe({
@@ -106,7 +109,7 @@ export class ChatBridgeService implements OnModuleInit {
     }
   }
 
-  private dispatchToBot(
+  private async dispatchToBot(
     topicId: string,
     message: ChatMessage,
     updateType: string
@@ -120,8 +123,12 @@ export class ChatBridgeService implements OnModuleInit {
         message.senderUserId || (message as any).senderUser?.id;
       if (senderUserId && this.chatUserBotMap.has(senderUserId)) return;
 
-      // Ищем ботов в этом топике
-      const botsInTopic = this.topicBotRegistry.get(topicId);
+      // Ищем ботов в этом топике; при промахе — лениво подтягиваем состав
+      // топика (новый диалог, созданный уже после старта бота).
+      let botsInTopic = this.topicBotRegistry.get(topicId);
+      if (!botsInTopic || botsInTopic.size === 0) {
+        botsInTopic = await this.resolveBotsInTopic(topicId);
+      }
       if (!botsInTopic || botsInTopic.size === 0) return;
 
       for (const botId of botsInTopic) {
@@ -156,6 +163,7 @@ export class ChatBridgeService implements OnModuleInit {
       replyMessageId?: string;
       ex?: any;
       taggedUserIds?: string[];
+      medias?: BotMedia[];
     }
   ): Promise<ChatApiResponse<ChatMessage>> {
     const chatUserId = this.botChatUserMap.get(botId);
@@ -170,10 +178,33 @@ export class ChatBridgeService implements OnModuleInit {
         text,
         replyMessageId: options?.replyMessageId,
         ex: options?.ex,
-        taggedUserIds: options?.taggedUserIds
+        taggedUserIds: options?.taggedUserIds,
+        medias: options?.medias
       },
       timeout: 10000
     });
+  }
+
+  /**
+   * Запросить у chat_server presigned-URL для прямой загрузки файла в MinIO.
+   * Файл НЕ проходит через шину — SDK льёт его напрямую в хранилище.
+   */
+  async getUploadUrl(
+    filename: string,
+    mimeType?: string
+  ): Promise<GetUploadUrlResult> {
+    const response = await this.amqp.request<
+      ChatApiResponse<GetUploadUrlResult>
+    >({
+      exchange: BOT_COMMANDS_EXCHANGE,
+      routingKey: RK_BOT_GET_UPLOAD_URL,
+      payload: { filename, mimeType },
+      timeout: 10000
+    });
+
+    if (!response.ok || !response.result)
+      throw new Error((response as any).error || 'Failed to get upload URL');
+    return response.result;
   }
 
   async editMessage(
@@ -339,14 +370,38 @@ export class ChatBridgeService implements OnModuleInit {
     }
   }
 
+  /**
+   * Ленивая регистрация: спрашиваем у chat_server состав топика и находим в нём
+   * известных ботов. Нужно для топиков, созданных уже после старта Сеп-бота
+   * (например, новый диалог пользователя с ботом из клиента).
+   */
+  private async resolveBotsInTopic(
+    topicId: string
+  ): Promise<Set<number> | undefined> {
+    if (this.chatUserBotMap.size === 0) return undefined;
+    try {
+      const memberIds = await this.getTopicMembers(topicId);
+      for (const memberId of memberIds) {
+        const botId = this.chatUserBotMap.get(memberId);
+        if (botId !== undefined) {
+          this.registerBotInTopic(topicId, botId);
+        }
+      }
+      return this.topicBotRegistry.get(topicId);
+    } catch (err) {
+      this.logger.error(
+        err instanceof Error ? err : new Error(String(err)),
+        `ChatBridge.resolveBotsInTopic(${topicId})`
+      );
+      return undefined;
+    }
+  }
+
   // ═══════════════════════════════════════════════════════════
   //  Helpers
   // ═══════════════════════════════════════════════════════════
 
-  private formatMessageToTelegramStyle(
-    message: ChatMessage,
-    topicId: string
-  ) {
+  private formatMessageToTelegramStyle(message: ChatMessage, topicId: string) {
     return {
       message_id: message.id,
       from: {
