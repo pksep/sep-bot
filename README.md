@@ -18,7 +18,7 @@ This project is licensed under the terms of the [SEP_ERP_SERVER License](./LICEN
 ## Installation
 
 ```bash
-$ pnpm install
+$ bun install
 $ cp .env.docker.example .env
 $ docker compose --env-file .env -f compose.yml up -d
 ```
@@ -30,20 +30,20 @@ $ docker compose --env-file .env -f compose.yml up -d
 Важно, должен быть установлен модуль sequelize глобально.
 
 ```bash
-$ pnpm run init
+$ bun run init
 ```
 
 ## Running the app
 
 ```bash
 # development
-$ pnpm run start
+$ bun run start
 
 # watch mode
-$ pnpm run start:dev
+$ bun run start:dev
 
 # production mode
-$ pnpm run start:prod
+$ bun run start:prod
 ```
 
 ## Postman
@@ -56,7 +56,7 @@ You can use the button to start a collection based on the SEP ERP server APIs
 
 ```bash
 # Для генерации документации проекта
-$ pnpm run docs
+$ bun run docs
 ```
 
 ## Code Style
@@ -89,19 +89,19 @@ $ pnpm run docs
 Для запуска юнит тестов:
 
 ```
-pnpm run test:unit
+bun run test:unit
 ```
 
 Для запуска тестов контроллеров:
 
 ```
-pnpm run test:e2e
+bun run test:e2e
 ```
 
 Для запуска всех тестов:
 
 ```
-pnpm run test
+bun run test
 ```
 
 ## Migrations
@@ -109,15 +109,15 @@ pnpm run test
 Для запуска миграций
 
 ```
-pnpm run migrate:up
-pnpm run migrate:down
-pnpm run migrate:status
+bun run migrate:up
+bun run migrate:down
+bun run migrate:status
 ```
 
 Также есть возможность указать конкретную миграцию:
 
 ```
-pnpm run migrate:up -- --name=***
+bun run migrate:up -- --name=***
 ```
 
 Миграции должны храниться в папке с текущей датой их создания, путь до миграции должен выглядеть так: 
@@ -134,5 +134,5 @@ sequelize migration:generate --name delete-old-field-detal-mass-zag --migrations
 Если локально в проекте:
 
 ```
-pnpx sequelize-cli migration:generate --name delete-old-field-detal-mass-zag --migrations-path ./migrations/2024/2
+bunx sequelize-cli migration:generate --name delete-old-field-detal-mass-zag --migrations-path ./migrations/2024/2
 ```
