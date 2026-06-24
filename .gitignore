@@ -68,3 +68,8 @@ source/
 *.pre-e2e.bak
 seed_bot.js
 seed_topic.sql
+
+# bun-only: чужие локфайлы не коммитим
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
