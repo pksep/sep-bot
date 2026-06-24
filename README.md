@@ -77,7 +77,7 @@ bun run build                            # nest build → dist/
 > собранный `contracts` (`cd ../contracts && bun install && bun run build`) **либо** переключить
 > зависимость на опубликованную npm-версию `@pksep/contracts`.
 
-Запуск собранного: `bun run start` (или `node dist/src/main.js` с нужным `NODE_ENV`).
+Запуск собранного: `bun run start` (или `node dist/main.js` с нужным `NODE_ENV`).
 
 ## Миграции
 
@@ -209,7 +209,7 @@ kubectl -n sep rollout status deploy/sep-bot
 > **pm2 vs реплики.** Образ по умолчанию запускает pm2-профиль `instance1` (`ecosystem.config.js`:
 > 8 воркеров `cluster`, `max_old_space 3072` → нужен под с ~6–8 ГБ RAM). В k8s идиоматичнее запускать
 > **1 процесс на под** и масштабировать `replicas`/HPA: переопредели команду на
-> `node dist/src/main.js` (или заведи pm2-профиль с `instances: 1`) и снизь лимиты памяти.
+> `node dist/main.js` (или заведи pm2-профиль с `instances: 1`) и снизь лимиты памяти.
 
 ## CI/CD
 

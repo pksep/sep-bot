@@ -2,7 +2,7 @@ module.exports = {
   apps: [
     {
       name: 'instance1',
-      script: './dist/src/main.js',
+      script: './dist/main.js',
       watch: false,
       instances: 8,
       exec_mode: 'cluster',
@@ -24,7 +24,7 @@ module.exports = {
     },
     {
       name: 'instance2-test',
-      script: './dist/src/main.js',
+      script: './dist/main.js',
       watch: false,
       instances: 2,
       exec_mode: 'cluster',
@@ -47,7 +47,7 @@ module.exports = {
     },
     {
       name: 'instance3',
-      script: './dist/src/main.js',
+      script: './dist/main.js',
       watch: false,
       instances: 4,
       exec_mode: 'cluster',

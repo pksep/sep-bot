@@ -30,7 +30,7 @@ COPY --from=deps /app/node_modules /app/node_modules
 
 RUN npm install -g pm2 cross-env
 
-RUN --mount=type=cache,id=build,target=/app/dist bun run build:lib && bun run build
+RUN --mount=type=cache,id=build,target=/app/dist bun run build
 
 RUN rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 

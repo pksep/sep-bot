@@ -28,7 +28,7 @@ COPY . .
 COPY ./env/${ENV_FILE} /app/env/.production.env
  
 RUN bun install --frozen-lockfile --ignore-scripts
-RUN bun run build:lib && bun run build
+RUN bun run build
  
 RUN npm install -g pm2
  
