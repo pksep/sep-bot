@@ -73,9 +73,7 @@ Swagger (Telegram-style методы и CRUD ботов): **`http://localhost:30
 bun run build                            # nest build → dist/
 ```
 
-> sep-bot зависит от `@pksep/contracts` как `file:../contracts` — для сборки рядом должен лежать
-> собранный `contracts` (`cd ../contracts && bun install && bun run build`) **либо** переключить
-> зависимость на опубликованную npm-версию `@pksep/contracts`.
+> sep-bot зависит от `@pksep/contracts` (npm, `^1.0.2`) — подтягивается автоматически при `bun install`.
 
 Запуск собранного: `bun run start` (или `node dist/main.js` с нужным `NODE_ENV`).
 
@@ -113,9 +111,7 @@ docker push <registry>/sep-bot:<tag>
 зашивать секреты в образ, а прокидывать env из `Secret` (см. ниже) — тогда `ENV_FILE` можно оставить
 шаблоном-плейсхолдером.
 
-> ⚠️ **Нюансы текущего `Dockerfile-kuber`** (унаследован от chat_server, под sep-bot не доадаптирован — поправить перед прод-сборкой):
-> - строка `bun run build:lib && bun run build` — скрипта **`build:lib` в sep-bot нет** (есть только `build`); заменить на `bun run build`;
-> - `@pksep/contracts` подключён как `file:../contracts` (вне контекста сборки образа) — `bun install` в образе его не найдёт. Переключить зависимость на npm-версию `@pksep/contracts` **или** собирать образ из контекста монорепо (`sep-chat/`) с доступным `../contracts`.
+> ✅ Зависимости тянутся из npm (`@pksep/contracts` — из реестра), `../contracts` для сборки образа не нужен.
 
 ## 2. Инфраструктура
 

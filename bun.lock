@@ -20,7 +20,7 @@
         "@nestjs/sequelize": "^10.0.0",
         "@nestjs/serve-static": "^4.0.0",
         "@nestjs/swagger": "^7.1.14",
-        "@pksep/contracts": "file:../contracts",
+        "@pksep/contracts": "^1.0.2",
         "@pksep/zod-shared": "0.0.507",
         "@types/bun": "^1.2.10",
         "amqplib": "^1.0.2",
@@ -529,7 +529,7 @@
 
     "@pkgr/core": ["@pkgr/core@0.2.9", "", {}, "sha512-QNqXyfVS2wm9hweSYD2O7F0G06uurj9kZ96TRQE5Y9hU7+tgdZwIkbAKc5Ocy1HxEY2kuDQa6cQ1WRs/O5LFKA=="],
 
-    "@pksep/contracts": ["@pksep/contracts@file:../contracts", { "devDependencies": { "typescript": "^6.0.2" } }],
+    "@pksep/contracts": ["@pksep/contracts@1.0.2", "", {}, "sha512-NKOPU9ILZzr8aZdsi+tol4cQjyvsh2ZyDyAHbJjMf9KBi8gcZivRFuVVNx7tQKsq5C3nbJrYoMO576kOuWL3Yw=="],
 
     "@pksep/zod-shared": ["@pksep/zod-shared@0.0.507", "", { "dependencies": { "@types/lodash": "^4.17.7", "lodash": "^4.17.21", "lz-string": "^1.5.0", "zod": "^3.23.8" } }, "sha512-i2D6vQ4Z3+0zovtGFkTrO99UddrJaFKI5GbiQ5zKhxfeBUSzJWjTnLwT2AVuwJjF83EVpXBlOKIaWFJhE2sYCA=="],
 
@@ -2566,8 +2566,6 @@
     "@nestjs/swagger/js-yaml": ["js-yaml@4.1.0", "", { "dependencies": { "argparse": "^2.0.1" }, "bin": { "js-yaml": "bin/js-yaml.js" } }, "sha512-wpxZs9NoxZaJESJGIZTyDEaYpl0FKSA+FB9aJiyemKhMwkxQg63h4T1KJgUGHpTqPDNRcmmYLugrRjJlBtWvRA=="],
 
     "@nestjs/swagger/lodash": ["lodash@4.17.21", "", {}, "sha512-v2kDEe57lecTulaDIuNTPy3Ry4gLGJ6Z1O3vE1krgXZNrsQ+LFTGHVxVjcXPs17LhbZVGedAJv8XZ1tvj5FvSg=="],
-
-    "@pksep/contracts/typescript": ["typescript@6.0.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-y2TvuxSZPDyQakkFRPZHKFm+KKVqIisdg9/CZwm9ftvKXLP8NRWj38/ODjNbr43SsoXqNuAisEf1GdCxqWcdBw=="],
 
     "@pm2/agent/chalk": ["chalk@3.0.0", "", { "dependencies": { "ansi-styles": "^4.1.0", "supports-color": "^7.1.0" } }, "sha512-4D3B6Wf41KOYRFdszmDqMCGq5VV/uMAB273JILmO+3jAlh8X4qDtdtgCR3fxtbLEMzSx22QdhnDcJvu2u1fVwg=="],
 
