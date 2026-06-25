@@ -22,9 +22,9 @@
     "test": "cross-env NODE_ENV=test jest --config ./jest.config.js --no-cache --verbose",
     "test:unit": "cross-env NODE_ENV=test jest --config ./jest.spec.config.js --verbose",
     "test:e2e": "cross-env NODE_ENV=test jest --config ./jest.e2e.config.js ",
-    "migrate:up": "cross-env NODE_ENV=production ts-node ./src/scripts/migrations/umzug.ts --to=up",
-    "migrate:down": "cross-env NODE_ENV=production ts-node ./src/scripts/migrations/umzug.ts --to=down",
-    "migrate:status": "cross-env NODE_ENV=production ts-node ./src/scripts/migrations/umzug.ts --to=status",
+    "migrate:up": "cross-env NODE_ENV=production ts-node -r tsconfig-paths/register ./src/scripts/migrations/umzug.ts --to=up",
+    "migrate:down": "cross-env NODE_ENV=production ts-node -r tsconfig-paths/register ./src/scripts/migrations/umzug.ts --to=down",
+    "migrate:status": "cross-env NODE_ENV=production ts-node -r tsconfig-paths/register ./src/scripts/migrations/umzug.ts --to=status",
     "prettier": "prettier -w src/**/*.ts -w src/**/*.json"
   },
   "dependencies": {
