@@ -41,7 +41,6 @@ RUN sed -i 's/\r$//' /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 ENV INSTANCE_NAME="instance1"
-ENV RUN_DB_SETUP="true" 
 
 EXPOSE 5000
 
