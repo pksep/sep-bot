@@ -17,6 +17,7 @@ import { BotsModule } from 'src/modules/bots/bots.module';
 import { UpdatesModule } from 'src/modules/updates/updates.module';
 import { BotApiModule } from 'src/modules/bot-api/bot-api.module';
 import { WebhooksModule } from 'src/modules/webhooks/webhooks.module';
+import { HealthModule } from 'src/modules/health/health.module';
 
 export const getCoreModules = (): (
   | DynamicModule
@@ -89,5 +90,6 @@ export const getAppModule = (): Type<any>[] => [
   BotsModule,
   UpdatesModule,
   BotApiModule,
-  WebhooksModule
+  WebhooksModule,
+  HealthModule
 ];

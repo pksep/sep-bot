@@ -5,6 +5,12 @@ import configFactory from 'src/configs/env.config';
 export class OriginMiddleware implements NestMiddleware {
   use(req: Request, res: Response, next: NextFunction) {
     try {
+      // Liveness/readiness probes (k8s, load balancers, curl) carry no Origin/Referer
+      // and must never be gated — otherwise the gateway looks "down" to every monitor.
+      if (/^\/(api\/)?health(\/|$)/.test(req.path)) {
+        return next();
+      }
+
       const config = configFactory();
 
       const allowedOrigins =

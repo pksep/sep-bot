@@ -2,7 +2,7 @@ import { Params } from 'nestjs-pino';
 import { randomUUID } from 'crypto';
 
 const isProd = process.env.NODE_ENV === 'production';
-const ignoredEndpoints = ['/health', '/metrics', '/favicon.ico'];
+const ignoredEndpoints = ['/api/health', '/health', '/metrics', '/favicon.ico'];
 
 const loggerConfig: Params = {
   pinoHttp: {
@@ -36,7 +36,7 @@ const loggerConfig: Params = {
       context: 'HTTP'
     }),
     autoLogging: {
-      ignore: req => ignoredEndpoints.includes(req.url)
+      ignore: req => ignoredEndpoints.some(p => req.url.startsWith(p))
     },
     transport: isProd
       ? undefined
