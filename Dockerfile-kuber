@@ -41,6 +41,9 @@ RUN sed -i 's/\r$//' /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 ENV INSTANCE_NAME="instance1"
+# Safe default: never wipe the DB on container start. Set RUN_DB_SETUP=true via the
+# k8s env ONCE to (re)initialise an empty environment — see README / docker-entrypoint.sh.
+ENV RUN_DB_SETUP="false"
 
 EXPOSE 5000
 
