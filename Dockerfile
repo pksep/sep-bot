@@ -28,7 +28,7 @@ RUN --mount=type=cache,id=bun,target=/root/.bun/install/cache \
 FROM base
 COPY --from=deps /app/node_modules /app/node_modules
 
-RUN npm install -g pm2 cross-env
+RUN npm install -g cross-env
 
 RUN --mount=type=cache,id=build,target=/app/dist bun run build
 
@@ -36,4 +36,4 @@ RUN rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 EXPOSE 5000
 
-CMD ["sh", "-c", "pm2-runtime start ecosystem.config.js --only instance1"]
+CMD ["node", "dist/main.js"]

@@ -11,5 +11,5 @@ fi
 echo "Running migrations..."
 bun run migrate:up
 
-echo "Starting PM2..."
+echo "Starting application..."
 exec "$@"

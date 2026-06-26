@@ -30,8 +30,6 @@ COPY ./env/${ENV_FILE} /app/env/.production.env
 RUN bun install --frozen-lockfile --ignore-scripts
 RUN bun run build
  
-RUN npm install -g pm2
- 
 ENV NODE_OPTIONS="--max_old_space_size=4096 --unhandled-rejections=strict"
 ENV UV_THREADPOOL_SIZE=4
 
@@ -40,7 +38,6 @@ COPY docker-entrypoint.sh /usr/local/bin/
 RUN sed -i 's/\r$//' /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
-ENV INSTANCE_NAME="instance1"
 # Safe default: never wipe the DB on container start. Set RUN_DB_SETUP=true via the
 # k8s env ONCE to (re)initialise an empty environment — see README / docker-entrypoint.sh.
 ENV RUN_DB_SETUP="false"
@@ -48,5 +45,5 @@ ENV RUN_DB_SETUP="false"
 EXPOSE 5000
 
 ENTRYPOINT ["docker-entrypoint.sh"]
- 
-CMD ["sh", "-c", "pm2-runtime start ecosystem.config.js --only ${INSTANCE_NAME}"]
+
+CMD ["node", "dist/main.js"]
