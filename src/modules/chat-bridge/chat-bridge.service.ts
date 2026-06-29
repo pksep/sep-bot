@@ -19,6 +19,7 @@ import {
   RK_BOT_EDIT_MESSAGE,
   RK_BOT_DELETE_MESSAGE,
   RK_BOT_CREATE_USER,
+  RK_BOT_UPDATE_USER,
   RK_BOT_GET_TOPIC_INFO,
   RK_BOT_GET_TOPIC_MEMBERS,
   RK_BOT_GET_USER_TOPICS,
@@ -245,17 +246,50 @@ export class ChatBridgeService implements OnModuleInit {
 
   async createBotUser(
     nickname: string,
-    displayName: string
+    displayName: string,
+    ownerUserId: string,
+    avatarUrl?: string
   ): Promise<ChatUser> {
+    const payload = {
+      nickname,
+      displayName,
+      ex: { botOwnerUserId: ownerUserId },
+      ...(avatarUrl ? { avatarUrl } : {})
+    };
+
     const response = await this.amqp.request<ChatApiResponse<ChatUser>>({
       exchange: BOT_COMMANDS_EXCHANGE,
       routingKey: RK_BOT_CREATE_USER,
-      payload: { nickname, displayName },
+      payload,
       timeout: 10000
     });
 
     if (!response.ok)
       throw new Error((response as any).error || 'Failed to create bot user');
+    return response.result;
+  }
+
+  async updateBotUser(
+    id: string,
+    payload: {
+      nickname?: string;
+      displayName?: string;
+      avatarUrl?: string;
+      ex?: unknown;
+    }
+  ): Promise<ChatUser> {
+    const response = await this.amqp.request<ChatApiResponse<ChatUser>>({
+      exchange: BOT_COMMANDS_EXCHANGE,
+      routingKey: RK_BOT_UPDATE_USER,
+      payload: {
+        id,
+        ...payload
+      },
+      timeout: 10000
+    });
+
+    if (!response.ok)
+      throw new Error((response as any).error || 'Failed to update bot user');
     return response.result;
   }
 
