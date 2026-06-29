@@ -1,0 +1,589 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SEP Bot SDK Tester</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #f4f5f7;
+        --panel: #ffffff;
+        --text: #1f2933;
+        --muted: #64748b;
+        --line: #d8dee8;
+        --primary: #1663d8;
+        --primary-hover: #0f51b8;
+        --danger: #b42318;
+        --success: #087443;
+        --input: #ffffff;
+        --shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #101418;
+          --panel: #171d24;
+          --text: #edf2f7;
+          --muted: #9aa7b7;
+          --line: #2c3540;
+          --primary: #4c8df6;
+          --primary-hover: #70a4ff;
+          --danger: #ff7a70;
+          --success: #45c486;
+          --input: #111820;
+          --shadow: none;
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: var(--bg);
+        color: var(--text);
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+          "Segoe UI", sans-serif;
+        letter-spacing: 0;
+      }
+
+      button,
+      input,
+      textarea,
+      select {
+        font: inherit;
+      }
+
+      .app {
+        display: grid;
+        grid-template-rows: auto 1fr;
+        min-height: 100vh;
+      }
+
+      .topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 14px 20px;
+        border-bottom: 1px solid var(--line);
+        background: var(--panel);
+      }
+
+      .title {
+        margin: 0;
+        font-size: 18px;
+        font-weight: 700;
+      }
+
+      .status {
+        min-width: 96px;
+        color: var(--muted);
+        font-size: 13px;
+        text-align: right;
+      }
+
+      .status.ok {
+        color: var(--success);
+      }
+
+      .status.error {
+        color: var(--danger);
+      }
+
+      .workspace {
+        display: grid;
+        grid-template-columns: minmax(320px, 420px) minmax(0, 1fr);
+        gap: 16px;
+        padding: 16px;
+      }
+
+      .panel {
+        min-width: 0;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+        box-shadow: var(--shadow);
+      }
+
+      .panel__head {
+        padding: 14px 16px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .panel__title {
+        margin: 0;
+        font-size: 14px;
+        font-weight: 700;
+      }
+
+      .panel__body {
+        display: grid;
+        gap: 12px;
+        padding: 16px;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .field {
+        display: grid;
+        gap: 6px;
+      }
+
+      label {
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 650;
+      }
+
+      input,
+      textarea,
+      select {
+        width: 100%;
+        min-width: 0;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: var(--input);
+        color: var(--text);
+        outline: none;
+      }
+
+      input,
+      select {
+        height: 38px;
+        padding: 0 10px;
+      }
+
+      textarea {
+        min-height: 92px;
+        resize: vertical;
+        padding: 10px;
+        line-height: 1.4;
+      }
+
+      input:focus,
+      textarea:focus,
+      select:focus {
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 20%, transparent);
+      }
+
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 36px;
+        padding: 0 12px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: var(--panel);
+        color: var(--text);
+        cursor: pointer;
+      }
+
+      .button:hover {
+        border-color: var(--primary);
+      }
+
+      .button--primary {
+        border-color: var(--primary);
+        background: var(--primary);
+        color: #ffffff;
+      }
+
+      .button--primary:hover {
+        background: var(--primary-hover);
+      }
+
+      .button--danger {
+        border-color: color-mix(in srgb, var(--danger) 50%, var(--line));
+        color: var(--danger);
+      }
+
+      .split {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(280px, 38%);
+        gap: 16px;
+      }
+
+      .output {
+        height: calc(100vh - 130px);
+        min-height: 420px;
+        margin: 0;
+        overflow: auto;
+        border-radius: 0 0 8px 8px;
+        padding: 16px;
+        background: #0e1724;
+        color: #d5e5ff;
+        font-family:
+          "JetBrains Mono", "SFMono-Regular", Consolas, "Liberation Mono",
+          monospace;
+        font-size: 12px;
+        line-height: 1.5;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+
+      .history {
+        display: grid;
+        gap: 8px;
+        max-height: calc(100vh - 130px);
+        overflow: auto;
+      }
+
+      .history__item {
+        display: grid;
+        gap: 4px;
+        padding: 10px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+      }
+
+      .history__method {
+        font-size: 12px;
+        font-weight: 750;
+      }
+
+      .history__meta {
+        color: var(--muted);
+        font-size: 11px;
+      }
+
+      @media (max-width: 980px) {
+        .workspace,
+        .split {
+          grid-template-columns: 1fr;
+        }
+
+        .output,
+        .history {
+          height: auto;
+          max-height: 520px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="app">
+      <header class="topbar">
+        <h1 class="title">SEP Bot SDK Tester</h1>
+        <div id="status" class="status">ready</div>
+      </header>
+
+      <div class="workspace">
+        <section class="panel">
+          <div class="panel__head">
+            <h2 class="panel__title">SDK request</h2>
+          </div>
+          <div class="panel__body">
+            <div class="field">
+              <label for="baseUrl">Bot API URL</label>
+              <input id="baseUrl" autocomplete="off" />
+            </div>
+
+            <div class="field">
+              <label for="token">Bot token</label>
+              <input id="token" autocomplete="off" spellcheck="false" />
+            </div>
+
+            <div class="grid">
+              <div class="field">
+                <label for="chatId">Chat ID</label>
+                <input id="chatId" autocomplete="off" spellcheck="false" />
+              </div>
+              <div class="field">
+                <label for="messageId">Message ID</label>
+                <input id="messageId" autocomplete="off" spellcheck="false" />
+              </div>
+            </div>
+
+            <div class="field">
+              <label for="text">Text</label>
+              <textarea id="text" spellcheck="false">Hello from @pksep/bot-api tester</textarea>
+            </div>
+
+            <div class="grid">
+              <div class="field">
+                <label for="offset">Updates offset</label>
+                <input id="offset" type="number" min="0" />
+              </div>
+              <div class="field">
+                <label for="timeout">Updates timeout</label>
+                <input id="timeout" type="number" min="0" value="2" />
+              </div>
+            </div>
+
+            <div class="field">
+              <label for="webhookUrl">Webhook URL</label>
+              <input id="webhookUrl" autocomplete="off" spellcheck="false" />
+            </div>
+
+            <div class="field">
+              <label for="fileInput">File</label>
+              <input id="fileInput" type="file" />
+            </div>
+
+            <div class="actions">
+              <button class="button button--primary" data-action="getMe">getMe</button>
+              <button class="button button--primary" data-action="sendMessage">sendMessage</button>
+              <button class="button" data-action="editMessageText">editMessageText</button>
+              <button class="button button--danger" data-action="deleteMessage">deleteMessage</button>
+              <button class="button" data-action="getUpdates">getUpdates</button>
+              <button class="button" data-action="getChat">getChat</button>
+              <button class="button" data-action="getChatMembersCount">getChatMembersCount</button>
+              <button class="button" data-action="sendFile">send file</button>
+              <button class="button" data-action="setWebhook">setWebhook</button>
+              <button class="button" data-action="deleteWebhook">deleteWebhook</button>
+              <button class="button" data-action="getWebhookInfo">getWebhookInfo</button>
+            </div>
+          </div>
+        </section>
+
+        <div class="split">
+          <section class="panel">
+            <div class="panel__head">
+              <h2 class="panel__title">Response</h2>
+            </div>
+            <pre id="output" class="output">{}</pre>
+          </section>
+
+          <section class="panel">
+            <div class="panel__head">
+              <h2 class="panel__title">History</h2>
+            </div>
+            <div id="history" class="panel__body history"></div>
+          </section>
+        </div>
+      </div>
+    </main>
+
+    <script type="module">
+      import { SepBot } from './vendor/pksep-bot-api.mjs';
+
+      const $ = id => document.getElementById(id);
+      const fields = {
+        baseUrl: $('baseUrl'),
+        token: $('token'),
+        chatId: $('chatId'),
+        messageId: $('messageId'),
+        text: $('text'),
+        offset: $('offset'),
+        timeout: $('timeout'),
+        webhookUrl: $('webhookUrl'),
+        fileInput: $('fileInput')
+      };
+      const output = $('output');
+      const history = $('history');
+      const status = $('status');
+      const storageKey = 'sep-bot-tester-state';
+
+      const defaultBase =
+        window.location.origin && window.location.protocol !== 'file:'
+          ? `${window.location.origin}/api`
+          : 'http://localhost:3001/api';
+
+      const readState = () => {
+        try {
+          return JSON.parse(localStorage.getItem(storageKey) || '{}');
+        } catch {
+          return {};
+        }
+      };
+
+      const writeState = () => {
+        const state = Object.fromEntries(
+          Object.entries(fields)
+            .filter(([, field]) => field.type !== 'file')
+            .map(([key, field]) => [key, field.value])
+        );
+        localStorage.setItem(storageKey, JSON.stringify(state));
+      };
+
+      const initialState = readState();
+      fields.baseUrl.value = initialState.baseUrl || defaultBase;
+      fields.token.value = initialState.token || '';
+      fields.chatId.value = initialState.chatId || '';
+      fields.messageId.value = initialState.messageId || '';
+      fields.text.value = initialState.text || fields.text.value;
+      fields.offset.value = initialState.offset || '';
+      fields.timeout.value = initialState.timeout || '2';
+      fields.webhookUrl.value = initialState.webhookUrl || '';
+
+      Object.values(fields).forEach(field => {
+        if (field.type !== 'file') {
+          field.addEventListener('input', writeState);
+        }
+      });
+
+      const setStatus = (text, type = '') => {
+        status.textContent = text;
+        status.className = `status ${type}`.trim();
+      };
+
+      const print = value => {
+        output.textContent = JSON.stringify(value, null, 2);
+      };
+
+      const requireValue = (field, name) => {
+        const value = field.value.trim();
+        if (!value) {
+          field.focus();
+          throw new Error(`${name} is required`);
+        }
+        return value;
+      };
+
+      const createBot = () =>
+        new SepBot(
+          requireValue(fields.token, 'Bot token'),
+          requireValue(fields.baseUrl, 'Bot API URL'),
+          { requestTimeout: 35_000 }
+        );
+
+      const addHistory = (method, state, duration) => {
+        const item = document.createElement('div');
+        item.className = 'history__item';
+        item.innerHTML = `
+          <div class="history__method">${method}</div>
+          <div class="history__meta">SDK ${state} · ${duration}ms · ${new Date().toLocaleTimeString()}</div>
+        `;
+        history.prepend(item);
+      };
+
+      const runSdk = async (method, runner) => {
+        const startedAt = performance.now();
+        try {
+          const result = await runner(createBot());
+          addHistory(method, 'ok', Math.round(performance.now() - startedAt));
+          return result;
+        } catch (error) {
+          addHistory(method, 'error', Math.round(performance.now() - startedAt));
+          throw error;
+        }
+      };
+
+      const updateMessageId = result => {
+        if (result?.message_id) {
+          fields.messageId.value = result.message_id;
+          writeState();
+        }
+      };
+
+      const buildFileInput = file => ({
+        data: file,
+        filename: file.name,
+        contentType: file.type || 'application/octet-stream'
+      });
+
+      const actions = {
+        getMe: () => runSdk('getMe', bot => bot.getMe()),
+        sendMessage: () =>
+          runSdk('sendMessage', bot =>
+            bot.sendMessage(
+              requireValue(fields.chatId, 'Chat ID'),
+              requireValue(fields.text, 'Text')
+            )
+          ),
+        editMessageText: () =>
+          runSdk('editMessageText', bot =>
+            bot.editMessageText(
+              requireValue(fields.chatId, 'Chat ID'),
+              requireValue(fields.messageId, 'Message ID'),
+              requireValue(fields.text, 'Text')
+            )
+          ),
+        deleteMessage: () =>
+          runSdk('deleteMessage', bot =>
+            bot.deleteMessage(
+              requireValue(fields.chatId, 'Chat ID'),
+              requireValue(fields.messageId, 'Message ID')
+            )
+          ),
+        getUpdates: () =>
+          runSdk('getUpdates', bot =>
+            bot.getUpdates({
+              offset: fields.offset.value ? Number(fields.offset.value) : undefined,
+              limit: 10,
+              timeout: fields.timeout.value ? Number(fields.timeout.value) : 0
+            })
+          ),
+        getChat: () =>
+          runSdk('getChat', bot =>
+            bot.getChat(requireValue(fields.chatId, 'Chat ID'))
+          ),
+        getChatMembersCount: () =>
+          runSdk('getChatMembersCount', bot =>
+            bot.getChatMembersCount(requireValue(fields.chatId, 'Chat ID'))
+          ),
+        setWebhook: () =>
+          runSdk('setWebhook', bot =>
+            bot.setWebhook(requireValue(fields.webhookUrl, 'Webhook URL'))
+          ),
+        deleteWebhook: () => runSdk('deleteWebhook', bot => bot.deleteWebhook()),
+        getWebhookInfo: () =>
+          runSdk('getWebhookInfo', bot => bot.getWebhookInfo()),
+        sendFile: async () => {
+          const file = fields.fileInput.files?.[0];
+          if (!file) {
+            throw new Error('File is required');
+          }
+
+          const isImage = (file.type || '').startsWith('image/');
+          return runSdk(isImage ? 'sendPhoto' : 'sendDocument', bot => {
+            const options = {
+              caption: fields.text.value.trim() || undefined
+            };
+            return isImage
+              ? bot.sendPhoto(
+                  requireValue(fields.chatId, 'Chat ID'),
+                  buildFileInput(file),
+                  options
+                )
+              : bot.sendDocument(
+                  requireValue(fields.chatId, 'Chat ID'),
+                  buildFileInput(file),
+                  options
+                );
+          });
+        }
+      };
+
+      document.addEventListener('click', async event => {
+        const button = event.target.closest('[data-action]');
+        if (!button) return;
+
+        const action = button.dataset.action;
+        button.disabled = true;
+        setStatus('running');
+
+        try {
+          const result = await actions[action]();
+          updateMessageId(result);
+          print(result);
+          setStatus('ok', 'ok');
+        } catch (error) {
+          print({
+            error: error instanceof Error ? error.message : String(error)
+          });
+          setStatus('error', 'error');
+        } finally {
+          button.disabled = false;
+        }
+      });
+    </script>
+  </body>
+</html>

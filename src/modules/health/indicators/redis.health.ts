@@ -15,9 +15,7 @@ import { withTimeout } from './with-timeout';
  */
 @Injectable()
 export class RedisHealthIndicator extends HealthIndicator {
-  constructor(
-    @InjectQueue('webhook-delivery') private readonly queue: Queue
-  ) {
+  constructor(@InjectQueue('webhook-delivery') private readonly queue: Queue) {
     super();
   }
 

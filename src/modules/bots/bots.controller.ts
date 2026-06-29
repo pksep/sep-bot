@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Patch,
   Post,
   Param,
   Headers,
@@ -10,7 +11,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { BotsService } from './bots.service';
-import { CreateBotDto } from './dto/bots.dto';
+import { CreateBotDto, UpdateBotDto } from './dto/bots.dto';
 import { UserId } from '../auth/user-id.decorator';
 
 @ApiTags('Bots Management')
@@ -38,7 +39,8 @@ export class BotsController {
       ownerUserId,
       dto.username,
       dto.displayName,
-      dto.description
+      dto.description,
+      dto.avatarUrl
     );
     return {
       ok: true,
@@ -61,12 +63,44 @@ export class BotsController {
       ok: true,
       result: bots.map(b => ({
         id: b.id,
+        chat_user_id: b.chatUserId,
         username: b.username,
         display_name: b.displayName,
         description: b.description,
         is_active: b.isActive,
         webhook: b.webhookConfig ? { url: b.webhookConfig.url } : null
       }))
+    };
+  }
+
+  @ApiOperation({ summary: 'Обновить профиль бота' })
+  @Patch(':id')
+  async updateBot(
+    @UserId() userId: string,
+    @Headers('x-owner-id') ownerHeader: string,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateBotDto
+  ) {
+    const ownerUserId = userId || ownerHeader;
+    if (!ownerUserId) {
+      throw new BadRequestException(
+        'Не удалось определить владельца бота: нет авторизации и заголовка X-Owner-Id'
+      );
+    }
+
+    const bot = await this.botsService.updateBot(id, ownerUserId, dto);
+
+    return {
+      ok: true,
+      result: {
+        id: bot.id,
+        chat_user_id: bot.chatUserId,
+        username: bot.username,
+        display_name: bot.displayName,
+        description: bot.description,
+        is_active: bot.isActive,
+        webhook: bot.webhookConfig ? { url: bot.webhookConfig.url } : null
+      }
     };
   }
 

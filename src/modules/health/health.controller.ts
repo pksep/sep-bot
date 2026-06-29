@@ -38,7 +38,9 @@ export class HealthController {
    */
   @Get('ready')
   @HealthCheck()
-  @ApiOperation({ summary: 'Readiness — Postgres, RabbitMQ and Redis are reachable' })
+  @ApiOperation({
+    summary: 'Readiness — Postgres, RabbitMQ and Redis are reachable'
+  })
   ready() {
     return this.health.check([
       () => this.db.ping(),

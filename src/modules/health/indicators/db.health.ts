@@ -11,9 +11,7 @@ import { withTimeout } from './with-timeout';
 /** Readiness probe for the bot gateway's own Postgres (`sep_bot`). */
 @Injectable()
 export class DbHealthIndicator extends HealthIndicator {
-  constructor(
-    @InjectConnection() private readonly sequelize: Sequelize
-  ) {
+  constructor(@InjectConnection() private readonly sequelize: Sequelize) {
     super();
   }
 

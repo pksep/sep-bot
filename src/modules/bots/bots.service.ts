@@ -15,6 +15,7 @@ import {
   createDecipheriv
 } from 'crypto';
 import { LoggerService } from '../logger/logger.service';
+import { UpdateBotDto } from './dto/bots.dto';
 
 @Injectable()
 export class BotsService implements OnModuleInit {
@@ -54,7 +55,8 @@ export class BotsService implements OnModuleInit {
     ownerUserId: string,
     username: string,
     displayName: string,
-    description?: string
+    description?: string,
+    avatarUrl?: string
   ): Promise<{ bot: Bot; token: string }> {
     const existing = await this.botRepository.findOne({
       where: { username }
@@ -67,7 +69,12 @@ export class BotsService implements OnModuleInit {
     }
 
     // 1. Создать пользователя-бота в chat_server
-    const chatUser = await this.chatBridge.createBotUser(username, displayName);
+    const chatUser = await this.chatBridge.createBotUser(
+      username,
+      displayName,
+      ownerUserId,
+      avatarUrl
+    );
 
     // 2. Создать запись бота (с временным токеном)
     const tempToken = this.generateRawToken(0);
@@ -95,6 +102,15 @@ export class BotsService implements OnModuleInit {
       apiTokenHash: finalHash
     });
 
+    await this.chatBridge.updateBotUser(chatUser.id, {
+      ex: {
+        botOwnerUserId: ownerUserId,
+        botId: bot.id,
+        isBot: true,
+        botUsername: username
+      }
+    });
+
     // 4. Зарегистрировать в bridge
     this.chatBridge.registerBot(bot.id, chatUser.id);
 
@@ -118,6 +134,66 @@ export class BotsService implements OnModuleInit {
 
   async findByOwner(ownerUserId: string): Promise<Bot[]> {
     return this.botRepository.findAll({ where: { ownerUserId } });
+  }
+
+  async updateBot(
+    botId: number,
+    ownerUserId: string,
+    dto: UpdateBotDto
+  ): Promise<Bot> {
+    const bot = await this.findOwnedBot(botId, ownerUserId);
+    const updateData: Partial<Bot> = {};
+    const nextUsername = dto.username?.trim().toLowerCase();
+    const nextDisplayName = dto.displayName?.trim();
+
+    if (nextUsername && nextUsername !== bot.username) {
+      const existing = await this.botRepository.findOne({
+        where: { username: nextUsername }
+      });
+
+      if (existing && existing.id !== bot.id) {
+        throw new HttpException(
+          'Бот с таким username уже существует',
+          HttpStatus.CONFLICT
+        );
+      }
+
+      updateData.username = nextUsername;
+    }
+
+    if (nextDisplayName !== undefined && nextDisplayName !== bot.displayName) {
+      updateData.displayName = nextDisplayName;
+    }
+
+    if (dto.description !== undefined) {
+      updateData.description = dto.description;
+    }
+
+    if (
+      nextUsername !== undefined ||
+      nextDisplayName !== undefined ||
+      dto.avatarUrl !== undefined
+    ) {
+      await this.chatBridge.updateBotUser(bot.chatUserId, {
+        ...(nextUsername !== undefined ? { nickname: nextUsername } : {}),
+        ...(nextDisplayName !== undefined
+          ? { displayName: nextDisplayName }
+          : {}),
+        ...(dto.avatarUrl !== undefined ? { avatarUrl: dto.avatarUrl } : {}),
+        ex: {
+          botOwnerUserId: ownerUserId,
+          botId: bot.id,
+          isBot: true,
+          botUsername: nextUsername || bot.username
+        }
+      });
+    }
+
+    if (Object.keys(updateData).length > 0) {
+      await bot.update(updateData);
+    }
+
+    return bot.reload();
   }
 
   // ─── Webhook ────────────────────────────────────────────

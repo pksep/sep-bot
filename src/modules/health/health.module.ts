@@ -9,7 +9,10 @@ import { RedisHealthIndicator } from './indicators/redis.health';
 @Module({
   // re-declaring the existing queue here only gives us a producer handle to PING
   // its Redis connection — the worker stays in WebhooksModule.
-  imports: [TerminusModule, BullModule.registerQueue({ name: 'webhook-delivery' })],
+  imports: [
+    TerminusModule,
+    BullModule.registerQueue({ name: 'webhook-delivery' })
+  ],
   controllers: [HealthController],
   providers: [DbHealthIndicator, RabbitHealthIndicator, RedisHealthIndicator]
 })

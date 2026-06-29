@@ -28,7 +28,7 @@ import {
             options: { durable: true }
           }
         ],
-        connectionInitOptions: { wait: true, timeout: 10000 },
+        connectionInitOptions: { wait: false },
         enableControllerDiscovery: true
       })
     })
