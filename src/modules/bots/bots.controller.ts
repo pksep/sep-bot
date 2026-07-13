@@ -20,6 +20,18 @@ import { UserId } from '../auth/user-id.decorator';
 export class BotsController {
   constructor(private botsService: BotsService) {}
 
+  private resolveOwnerUserId(userId?: string, ownerHeader?: string): string {
+    const ownerUserId = userId || ownerHeader;
+
+    if (!ownerUserId) {
+      throw new BadRequestException(
+        'Не удалось определить владельца бота: нет авторизации и заголовка X-Owner-Id'
+      );
+    }
+
+    return ownerUserId;
+  }
+
   @ApiOperation({ summary: 'Создать нового бота' })
   @Post()
   async createBot(
@@ -29,12 +41,7 @@ export class BotsController {
   ) {
     // В проде владелец берётся из JWT (req.user). Для локального dev-режима,
     // где гард пропускает запрос без user, владельца передаёт клиент в X-Owner-Id.
-    const ownerUserId = userId || ownerHeader;
-    if (!ownerUserId) {
-      throw new BadRequestException(
-        'Не удалось определить владельца бота: нет авторизации и заголовка X-Owner-Id'
-      );
-    }
+    const ownerUserId = this.resolveOwnerUserId(userId, ownerHeader);
     const { bot, token } = await this.botsService.createBot(
       ownerUserId,
       dto.username,
@@ -57,8 +64,12 @@ export class BotsController {
 
   @ApiOperation({ summary: 'Получить список моих ботов' })
   @Get()
-  async getMyBots(@UserId() userId: string) {
-    const bots = await this.botsService.findByOwner(userId);
+  async getMyBots(
+    @UserId() userId: string,
+    @Headers('x-owner-id') ownerHeader: string
+  ) {
+    const ownerUserId = this.resolveOwnerUserId(userId, ownerHeader);
+    const bots = await this.botsService.findByOwner(ownerUserId);
     return {
       ok: true,
       result: bots.map(b => ({
@@ -81,12 +92,7 @@ export class BotsController {
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateBotDto
   ) {
-    const ownerUserId = userId || ownerHeader;
-    if (!ownerUserId) {
-      throw new BadRequestException(
-        'Не удалось определить владельца бота: нет авторизации и заголовка X-Owner-Id'
-      );
-    }
+    const ownerUserId = this.resolveOwnerUserId(userId, ownerHeader);
 
     const bot = await this.botsService.updateBot(id, ownerUserId, dto);
 
@@ -108,9 +114,11 @@ export class BotsController {
   @Post(':id/regenerate-token')
   async regenerateToken(
     @UserId() userId: string,
+    @Headers('x-owner-id') ownerHeader: string,
     @Param('id', ParseIntPipe) id: number
   ) {
-    const token = await this.botsService.regenerateToken(id, userId);
+    const ownerUserId = this.resolveOwnerUserId(userId, ownerHeader);
+    const token = await this.botsService.regenerateToken(id, ownerUserId);
     return { ok: true, result: { token } };
   }
 
@@ -118,9 +126,11 @@ export class BotsController {
   @Post(':id/deactivate')
   async deactivateBot(
     @UserId() userId: string,
+    @Headers('x-owner-id') ownerHeader: string,
     @Param('id', ParseIntPipe) id: number
   ) {
-    await this.botsService.deactivateBot(id, userId);
+    const ownerUserId = this.resolveOwnerUserId(userId, ownerHeader);
+    await this.botsService.deactivateBot(id, ownerUserId);
     return { ok: true, result: true };
   }
 
@@ -128,9 +138,11 @@ export class BotsController {
   @Post(':id/activate')
   async activateBot(
     @UserId() userId: string,
+    @Headers('x-owner-id') ownerHeader: string,
     @Param('id', ParseIntPipe) id: number
   ) {
-    await this.botsService.activateBot(id, userId);
+    const ownerUserId = this.resolveOwnerUserId(userId, ownerHeader);
+    await this.botsService.activateBot(id, ownerUserId);
     return { ok: true, result: true };
   }
 }

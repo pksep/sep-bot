@@ -20,6 +20,7 @@ import {
   RK_BOT_DELETE_MESSAGE,
   RK_BOT_CREATE_USER,
   RK_BOT_UPDATE_USER,
+  RK_BOT_DELETE_USER,
   RK_BOT_GET_TOPIC_INFO,
   RK_BOT_GET_TOPIC_MEMBERS,
   RK_BOT_GET_USER_TOPICS,
@@ -297,6 +298,17 @@ export class ChatBridgeService implements OnModuleInit {
   //  RPC — топики
   // ═══════════════════════════════════════════════════════════
 
+  async deleteBotUser(id: string): Promise<boolean> {
+    const response = await this.amqp.request<ChatApiResponse>({
+      exchange: BOT_COMMANDS_EXCHANGE,
+      routingKey: RK_BOT_DELETE_USER,
+      payload: { id },
+      timeout: 10000
+    });
+
+    return response.ok;
+  }
+
   async getTopicInfo(topicId: string): Promise<any> {
     const response = await this.amqp.request<ChatApiResponse>({
       exchange: BOT_COMMANDS_EXCHANGE,
@@ -344,12 +356,13 @@ export class ChatBridgeService implements OnModuleInit {
   async removeBotFromTopic(
     topicId: string,
     botUserId: string,
-    actorId: string
+    actorId: string,
+    options?: { force?: boolean }
   ): Promise<boolean> {
     const response = await this.amqp.request<ChatApiResponse>({
       exchange: BOT_COMMANDS_EXCHANGE,
       routingKey: RK_BOT_REMOVE_FROM_TOPIC,
-      payload: { topicId, botUserId, actorId },
+      payload: { topicId, botUserId, actorId, force: options?.force },
       timeout: 10000
     });
     return response.ok;
