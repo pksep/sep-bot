@@ -240,8 +240,40 @@ export class BotsService implements OnModuleInit {
 
   async deactivateBot(botId: number, ownerUserId: string): Promise<void> {
     const bot = await this.findOwnedBot(botId, ownerUserId);
-    await bot.update({ isActive: false });
+    const topicIds = await this.chatBridge.getUserTopicIds(bot.chatUserId);
+    const failedTopicIds: string[] = [];
+
+    for (const topicId of topicIds) {
+      const removed = await this.chatBridge.removeBotFromTopic(
+        topicId,
+        bot.chatUserId,
+        ownerUserId,
+        { force: true }
+      );
+
+      if (!removed) {
+        failedTopicIds.push(topicId);
+      }
+    }
+
+    if (failedTopicIds.length > 0) {
+      throw new HttpException(
+        `Не удалось удалить бота из топиков: ${failedTopicIds.join(', ')}`,
+        HttpStatus.BAD_GATEWAY
+      );
+    }
+
+    const isUserDeleted = await this.chatBridge.deleteBotUser(bot.chatUserId);
+
+    if (!isUserDeleted) {
+      throw new HttpException(
+        'Не удалось удалить пользователя-бота из chat_server',
+        HttpStatus.BAD_GATEWAY
+      );
+    }
+
     this.chatBridge.unregisterBot(botId);
+    await bot.destroy();
   }
 
   async activateBot(botId: number, ownerUserId: string): Promise<void> {
