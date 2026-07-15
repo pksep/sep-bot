@@ -21,7 +21,9 @@ export default function configFactory() {
       bucketName: process.env.MINIO_BUCKET_NAME!,
       endpoint: process.env.MINIO_ENDPOINT!,
       // K8s injects MINIO_PORT=tcp://ip:port — extract numeric part only
-      port: (process.env.MINIO_PORT ?? '').match(/(\d+)$/)?.[1] ?? process.env.MINIO_PORT!,
+      port:
+        (process.env.MINIO_PORT ?? '').match(/(\d+)$/)?.[1] ??
+        process.env.MINIO_PORT!,
       ssl: process.env.MINIO_USE_SSL!,
       publicBaseUrl: process.env.MINIO_PUBLIC_BASE_URL!,
       isPathStyle: process.env.MINIO_PATH_STYLE!

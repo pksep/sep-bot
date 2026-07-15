@@ -138,7 +138,9 @@ export class BotsService implements OnModuleInit {
   }
 
   async findByChatUserId(chatUserId: string): Promise<Bot | null> {
-    return this.botRepository.findOne({ where: { chatUserId, isActive: true } });
+    return this.botRepository.findOne({
+      where: { chatUserId, isActive: true }
+    });
   }
 
   async updateBot(
