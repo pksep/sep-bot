@@ -14,12 +14,18 @@ export interface BotWebhookConfig {
   maxConnections?: number;
 }
 
+export interface BotCommand {
+  command: string;
+  description: string;
+}
+
 export interface BotCreationAttributes {
   chatUserId: string;
   ownerUserId: string;
   username: string;
   displayName: string;
   description?: string;
+  commands?: BotCommand[];
   apiToken: string;
   apiTokenHash: string;
   isActive?: boolean;
@@ -65,6 +71,13 @@ export class Bot extends Model<Bot, BotCreationAttributes> {
 
   @Column({ type: DataType.TEXT, allowNull: true })
   description: string;
+
+  @Column({
+    type: DataType.JSONB,
+    allowNull: false,
+    defaultValue: []
+  })
+  commands: BotCommand[];
 
   /** AES-256-GCM зашифрованный токен */
   @Column({

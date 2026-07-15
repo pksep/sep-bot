@@ -1,11 +1,12 @@
 import {
+  BadRequestException,
   HttpException,
   HttpStatus,
   Injectable,
   OnModuleInit
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/sequelize';
-import { Bot, BotWebhookConfig } from './model/bots.model';
+import { Bot, BotCommand, BotWebhookConfig } from './model/bots.model';
 import { ChatBridgeService } from '../chat-bridge/chat-bridge.service';
 import { ConfigService } from '@nestjs/config';
 import {
@@ -136,6 +137,12 @@ export class BotsService implements OnModuleInit {
     return this.botRepository.findAll({ where: { ownerUserId } });
   }
 
+  async findByChatUserId(chatUserId: string): Promise<Bot | null> {
+    return this.botRepository.findOne({
+      where: { chatUserId, isActive: true }
+    });
+  }
+
   async updateBot(
     botId: number,
     ownerUserId: string,
@@ -197,6 +204,25 @@ export class BotsService implements OnModuleInit {
   }
 
   // ─── Webhook ────────────────────────────────────────────
+
+  async setCommands(botId: number, commands: BotCommand[]): Promise<void> {
+    const normalizedCommands = this.normalizeBotCommands(commands);
+
+    await this.botRepository.update(
+      { commands: normalizedCommands },
+      { where: { id: botId } }
+    );
+  }
+
+  async getCommands(botId: number): Promise<BotCommand[]> {
+    const bot = await this.botRepository.findByPk(botId);
+    return bot?.commands || [];
+  }
+
+  async getCommandsByChatUserId(chatUserId: string): Promise<BotCommand[]> {
+    const bot = await this.findByChatUserId(chatUserId);
+    return bot?.commands || [];
+  }
 
   async setWebhook(botId: number, config: BotWebhookConfig): Promise<void> {
     await this.botRepository.update(
@@ -293,6 +319,52 @@ export class BotsService implements OnModuleInit {
       throw new HttpException('Бот не найден', HttpStatus.NOT_FOUND);
     }
     return bot;
+  }
+
+  private normalizeBotCommands(commands?: BotCommand[]): BotCommand[] {
+    if (!commands) {
+      return [];
+    }
+
+    if (!Array.isArray(commands) || commands.length > 50) {
+      throw new BadRequestException('Invalid bot commands');
+    }
+
+    const seenCommands = new Set<string>();
+    const normalizedCommands: BotCommand[] = [];
+
+    for (const command of commands) {
+      const commandName = this.normalizeBotCommandName(command.command);
+      const description = command.description?.trim();
+
+      if (!commandName || !description) {
+        throw new BadRequestException('Invalid bot command');
+      }
+
+      const commandKey = commandName.toLowerCase();
+
+      if (seenCommands.has(commandKey)) {
+        throw new BadRequestException(`Duplicate bot command: ${commandName}`);
+      }
+
+      seenCommands.add(commandKey);
+      normalizedCommands.push({
+        command: commandName,
+        description
+      });
+    }
+
+    return normalizedCommands;
+  }
+
+  private normalizeBotCommandName(command: string): string {
+    const normalized = command
+      .trim()
+      .replace(/^\/+/, '')
+      .split(/\s+/)[0]
+      ?.replace(/[^a-zA-Z0-9_-]/g, '');
+
+    return normalized ? `/${normalized}` : '';
   }
 
   private generateRawToken(botId: number): string {

@@ -57,6 +57,7 @@ export class BotsController {
         username: bot.username,
         display_name: bot.displayName,
         description: bot.description,
+        commands: bot.commands || [],
         token // показывается ОДИН РАЗ
       }
     };
@@ -78,9 +79,28 @@ export class BotsController {
         username: b.username,
         display_name: b.displayName,
         description: b.description,
+        commands: b.commands || [],
         is_active: b.isActive,
         webhook: b.webhookConfig ? { url: b.webhookConfig.url } : null
       }))
+    };
+  }
+
+  @ApiOperation({ summary: 'Получить команды бота по chat user id' })
+  @Get('chat-users/:chatUserId/commands')
+  async getBotCommandsByChatUserId(@Param('chatUserId') chatUserId: string) {
+    const bot = await this.botsService.findByChatUserId(chatUserId);
+
+    return {
+      ok: true,
+      result: bot
+        ? {
+            id: bot.id,
+            chat_user_id: bot.chatUserId,
+            username: bot.username,
+            commands: bot.commands || []
+          }
+        : null
     };
   }
 
@@ -104,6 +124,7 @@ export class BotsController {
         username: bot.username,
         display_name: bot.displayName,
         description: bot.description,
+        commands: bot.commands || [],
         is_active: bot.isActive,
         webhook: bot.webhookConfig ? { url: bot.webhookConfig.url } : null
       }

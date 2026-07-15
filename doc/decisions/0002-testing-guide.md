@@ -114,11 +114,15 @@ curl -X POST http://localhost:3001/api/bots \
   -d '{
     "username": "test_bot",
     "displayName": "Тестовый Бот",
-    "description": "Бот для тестирования"
+    "description": "Бот для тестирования",
+    "commands": [
+      { "command": "/start", "description": "Начать работу"Ш },
+      { "command": "help", "description": "Показать помощь" }
+    ]
   }'
 
 # Ответ содержит token — СОХРАНИТЕ ЕГО!
-# { "ok": true, "result": { "bot": {...}, "token": "1:abc123..." } }
+# { "ok": true, "result": { "commands": [...], "token": "1:abc123..." } }
 ```
 
 Запишите:
@@ -206,6 +210,7 @@ curl -X POST http://localhost:3001/api/bot${BOT_TOKEN}/deleteWebhook
 | # | Тест | Как проверить | Ожидание |
 |---|------|---------------|----------|
 | 1 | Создание бота | POST /api/bots | 200 + token в ответе |
+| 1a | Команды бота | POST/PATCH /api/bots с `commands` → GET /api/bots | Команды сохраняются в `bots.commands` и возвращаются в ответе |
 | 2 | getMe | POST /bot{token}/getMe | Данные бота |
 | 3 | sendMessage | POST /bot{token}/sendMessage | message_id в ответе + сообщение видно в чате |
 | 4 | getUpdates (пустые) | POST /bot{token}/getUpdates {timeout:5} | [] через 5 сек |

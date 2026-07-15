@@ -147,7 +147,7 @@ chat_server ──Pub/Sub──→ RabbitMQ ──→ chat-bot (получает
 
 | Таблица | Назначение | Ключевые поля |
 |---------|------------|---------------|
-| `bots` | Реестр ботов | `chat_user_id` (UUID → User), `api_token` (AES-256-GCM), `api_token_hash` (SHA-256), `webhook_config` |
+| `bots` | Реестр ботов | `chat_user_id` (UUID → User), `api_token` (AES-256-GCM), `api_token_hash` (SHA-256), `commands` (JSONB), `webhook_config` |
 | `updates` | Очередь обновлений | `bot_id`, `type`, `payload` (JSONB) |
 
 ### API-токены
