@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ChatBridgeService } from '../chat-bridge/chat-bridge.service';
 import { UpdatesService } from '../updates/updates.service';
 import { BotsService } from '../bots/bots.service';
-import { Bot } from '../bots/model/bots.model';
+import { Bot, BotCommand } from '../bots/model/bots.model';
 import { ITelegramApiResponse } from 'src/core/interface/pagination';
 import { ChatMessage } from '../chat-bridge/interfaces/chat-types';
 
@@ -55,6 +55,10 @@ interface SetWebhookParams {
   url: string;
   secret?: string;
   allowed_updates?: string[];
+}
+
+interface SetMyCommandsParams {
+  commands: BotCommand[];
 }
 
 interface ChatIdParam {
@@ -114,6 +118,26 @@ export class BotApiService {
   }
 
   // ─── Messages ─────────────────────────────────────────
+
+  async setMyCommands(
+    bot: Bot,
+    params: SetMyCommandsParams
+  ): Promise<ITelegramApiResponse> {
+    try {
+      await this.botsService.setCommands(bot.id, params.commands);
+      return this.ok(true);
+    } catch (err: unknown) {
+      return this.error(400, this.getErrorMessage(err));
+    }
+  }
+
+  async getMyCommands(bot: Bot): Promise<ITelegramApiResponse> {
+    try {
+      return this.ok(await this.botsService.getCommands(bot.id));
+    } catch (err: unknown) {
+      return this.error(400, this.getErrorMessage(err));
+    }
+  }
 
   async sendMessage(
     bot: Bot,

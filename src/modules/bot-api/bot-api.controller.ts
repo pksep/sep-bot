@@ -4,6 +4,7 @@ import { BotApiService } from './bot-api.service';
 import { BotApiAuthGuard } from './guards/bot-api-auth.guard';
 import { CurrentBot } from './decorators/bot.decorator';
 import { Bot } from '../bots/model/bots.model';
+import { SetMyCommandsDto } from '../bots/dto/bots.dto';
 
 @ApiTags('Bot API')
 @UseGuards(BotApiAuthGuard)
@@ -11,15 +12,25 @@ import { Bot } from '../bots/model/bots.model';
 export class BotApiController {
   constructor(private botApiService: BotApiService) {}
 
-  // ─── Info ─────────────────────────────────────────────
-  @ApiOperation({ summary: 'getMe — информация о боте' })
+  @ApiOperation({ summary: 'getMe - get bot info' })
   @Post('getMe')
   getMe(@CurrentBot() bot: Bot) {
     return this.botApiService.getMe(bot);
   }
 
-  // ─── Messages ─────────────────────────────────────────
-  @ApiOperation({ summary: 'sendMessage — отправить сообщение' })
+  @ApiOperation({ summary: 'setMyCommands - register bot commands' })
+  @Post('setMyCommands')
+  setMyCommands(@CurrentBot() bot: Bot, @Body() body: SetMyCommandsDto) {
+    return this.botApiService.setMyCommands(bot, body);
+  }
+
+  @ApiOperation({ summary: 'getMyCommands - get bot commands' })
+  @Post('getMyCommands')
+  getMyCommands(@CurrentBot() bot: Bot) {
+    return this.botApiService.getMyCommands(bot);
+  }
+
+  @ApiOperation({ summary: 'sendMessage - send a message' })
   @Post('sendMessage')
   sendMessage(
     @CurrentBot() bot: Bot,
@@ -34,7 +45,7 @@ export class BotApiController {
     return this.botApiService.sendMessage(bot, body);
   }
 
-  @ApiOperation({ summary: 'editMessageText — редактировать сообщение' })
+  @ApiOperation({ summary: 'editMessageText - edit a message' })
   @Post('editMessageText')
   editMessageText(
     @CurrentBot() bot: Bot,
@@ -49,7 +60,7 @@ export class BotApiController {
     return this.botApiService.editMessageText(bot, body);
   }
 
-  @ApiOperation({ summary: 'deleteMessage — удалить сообщение' })
+  @ApiOperation({ summary: 'deleteMessage - delete a message' })
   @Post('deleteMessage')
   deleteMessage(
     @CurrentBot() bot: Bot,
@@ -62,8 +73,7 @@ export class BotApiController {
     return this.botApiService.deleteMessage(bot, body);
   }
 
-  // ─── Files ────────────────────────────────────────────
-  @ApiOperation({ summary: 'getUploadUrl — presigned-URL для загрузки файла' })
+  @ApiOperation({ summary: 'getUploadUrl - get a presigned upload URL' })
   @Post('getUploadUrl')
   getUploadUrl(
     @CurrentBot() bot: Bot,
@@ -72,7 +82,7 @@ export class BotApiController {
     return this.botApiService.getUploadUrl(bot, body);
   }
 
-  @ApiOperation({ summary: 'sendDocument — отправить файл (по file_id)' })
+  @ApiOperation({ summary: 'sendDocument - send a file by file_id' })
   @Post('sendDocument')
   sendDocument(
     @CurrentBot() bot: Bot,
@@ -92,7 +102,7 @@ export class BotApiController {
     return this.botApiService.sendDocument(bot, body);
   }
 
-  @ApiOperation({ summary: 'sendPhoto — отправить изображение (по file_id)' })
+  @ApiOperation({ summary: 'sendPhoto - send an image by file_id' })
   @Post('sendPhoto')
   sendPhoto(
     @CurrentBot() bot: Bot,
@@ -111,8 +121,7 @@ export class BotApiController {
     return this.botApiService.sendDocument(bot, { ...body, type: 'IMAGE' });
   }
 
-  // ─── Updates ──────────────────────────────────────────
-  @ApiOperation({ summary: 'getUpdates — long polling обновлений' })
+  @ApiOperation({ summary: 'getUpdates - long polling updates' })
   @Post('getUpdates')
   getUpdates(
     @CurrentBot() bot: Bot,
@@ -126,8 +135,7 @@ export class BotApiController {
     return this.botApiService.getUpdates(bot, body);
   }
 
-  // ─── Webhooks ─────────────────────────────────────────
-  @ApiOperation({ summary: 'setWebhook — настроить webhook' })
+  @ApiOperation({ summary: 'setWebhook - configure webhook' })
   @Post('setWebhook')
   setWebhook(
     @CurrentBot() bot: Bot,
@@ -141,26 +149,25 @@ export class BotApiController {
     return this.botApiService.setWebhook(bot, body);
   }
 
-  @ApiOperation({ summary: 'deleteWebhook — удалить webhook' })
+  @ApiOperation({ summary: 'deleteWebhook - delete webhook' })
   @Post('deleteWebhook')
   deleteWebhook(@CurrentBot() bot: Bot) {
     return this.botApiService.deleteWebhook(bot);
   }
 
-  @ApiOperation({ summary: 'getWebhookInfo — информация о webhook' })
+  @ApiOperation({ summary: 'getWebhookInfo - get webhook info' })
   @Post('getWebhookInfo')
   getWebhookInfo(@CurrentBot() bot: Bot) {
     return this.botApiService.getWebhookInfo(bot);
   }
 
-  // ─── Chats ────────────────────────────────────────────
-  @ApiOperation({ summary: 'getChat — информация о чате' })
+  @ApiOperation({ summary: 'getChat - get chat info' })
   @Post('getChat')
   getChat(@CurrentBot() bot: Bot, @Body() body: { chat_id: string }) {
     return this.botApiService.getChat(bot, body);
   }
 
-  @ApiOperation({ summary: 'getChatMembersCount — количество участников' })
+  @ApiOperation({ summary: 'getChatMembersCount - get member count' })
   @Post('getChatMembersCount')
   getChatMembersCount(
     @CurrentBot() bot: Bot,
