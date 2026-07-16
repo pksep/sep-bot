@@ -18,6 +18,9 @@ import { UserId } from '../auth/user-id.decorator';
 @ApiBearerAuth()
 @Controller('bots')
 export class BotsController {
+  private readonly uuidPattern =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
   constructor(private botsService: BotsService) {}
 
   private resolveOwnerUserId(userId?: string, ownerHeader?: string): string {
@@ -29,7 +32,25 @@ export class BotsController {
       );
     }
 
+    if (!this.uuidPattern.test(ownerUserId)) {
+      throw new BadRequestException(
+        'Некорректный идентификатор владельца бота'
+      );
+    }
+
     return ownerUserId;
+  }
+
+  private resolveChatUserId(chatUserId?: string): string {
+    const normalizedChatUserId = chatUserId?.trim();
+
+    if (!normalizedChatUserId || !this.uuidPattern.test(normalizedChatUserId)) {
+      throw new BadRequestException(
+        'Некорректный идентификатор пользователя-бота'
+      );
+    }
+
+    return normalizedChatUserId;
   }
 
   @ApiOperation({ summary: 'Создать нового бота' })
@@ -87,9 +108,17 @@ export class BotsController {
   }
 
   @ApiOperation({ summary: 'Получить команды бота по chat user id' })
+  @Get('chat-users/commands')
+  getBotCommandsWithoutChatUserId() {
+    throw new BadRequestException('Не указан идентификатор пользователя-бота');
+  }
+
+  @ApiOperation({ summary: 'Получить команды бота по chat user id' })
   @Get('chat-users/:chatUserId/commands')
   async getBotCommandsByChatUserId(@Param('chatUserId') chatUserId: string) {
-    const bot = await this.botsService.findByChatUserId(chatUserId);
+    const bot = await this.botsService.findByChatUserId(
+      this.resolveChatUserId(chatUserId)
+    );
 
     return {
       ok: true,
