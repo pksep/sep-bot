@@ -46,6 +46,7 @@ export interface WsChangePayload<T = any> {
 export interface ChatApiResponse<T = any> {
   ok: boolean;
   result?: T;
+  error?: string;
   error_code?: number;
   description?: string;
 }

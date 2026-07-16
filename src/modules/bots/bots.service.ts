@@ -289,7 +289,23 @@ export class BotsService implements OnModuleInit {
       );
     }
 
-    const isUserDeleted = await this.chatBridge.deleteBotUser(bot.chatUserId);
+    let isUserDeleted = false;
+
+    try {
+      isUserDeleted = await this.chatBridge.deleteBotUser(bot.chatUserId);
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error(String(err));
+
+      this.logger.error(
+        error,
+        `BotsService.deactivateBot(${botId}).deleteBotUser`
+      );
+
+      throw new HttpException(
+        `Не удалось удалить пользователя-бота из chat_server: ${error.message}`,
+        HttpStatus.BAD_GATEWAY
+      );
+    }
 
     if (!isUserDeleted) {
       throw new HttpException(

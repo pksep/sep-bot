@@ -306,6 +306,12 @@ export class ChatBridgeService implements OnModuleInit {
       timeout: 10000
     });
 
+    if (!response.ok) {
+      throw new Error(
+        response.error || response.description || 'Failed to delete bot user'
+      );
+    }
+
     return response.ok;
   }
 
