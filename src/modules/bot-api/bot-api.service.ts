@@ -314,7 +314,10 @@ export class BotApiService {
 
   async getChat(bot: Bot, params: ChatIdParam): Promise<ITelegramApiResponse> {
     try {
-      const topic = await this.chatBridge.getTopicInfo(params.chat_id);
+      const topic = await this.chatBridge.getTopicInfo(
+        params.chat_id,
+        bot.chatUserId
+      );
       return this.ok({
         id: topic.id,
         type: topic.type === 'DM' ? 'private' : 'group'
@@ -329,7 +332,10 @@ export class BotApiService {
     params: ChatIdParam
   ): Promise<ITelegramApiResponse> {
     try {
-      const members = await this.chatBridge.getTopicMembers(params.chat_id);
+      const members = await this.chatBridge.getTopicMembers(
+        params.chat_id,
+        bot.chatUserId
+      );
       return this.ok(members.length);
     } catch (err: unknown) {
       return this.error(400, this.getErrorMessage(err));
