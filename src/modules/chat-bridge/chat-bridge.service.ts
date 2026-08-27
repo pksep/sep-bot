@@ -315,23 +315,47 @@ export class ChatBridgeService implements OnModuleInit {
     return response.ok;
   }
 
-  async getTopicInfo(topicId: string): Promise<any> {
+  async getTopicInfo(topicId: string, requesterUserId: string): Promise<any> {
     const response = await this.amqp.request<ChatApiResponse>({
       exchange: BOT_COMMANDS_EXCHANGE,
       routingKey: RK_BOT_GET_TOPIC_INFO,
-      payload: { topicId },
+      payload: { topicId, requesterUserId },
       timeout: 10000
     });
+
+    if (!response.ok) {
+      throw new Error(
+        response.error || response.description || 'Topic access denied'
+      );
+    }
+
     return response.result;
   }
 
-  async getTopicMembers(topicId: string): Promise<string[]> {
+  async getTopicMembers(
+    topicId: string,
+    requesterUserId: string
+  ): Promise<string[]> {
+    return this.requestTopicMembers(topicId, requesterUserId);
+  }
+
+  private async requestTopicMembers(
+    topicId: string,
+    requesterUserId?: string
+  ): Promise<string[]> {
     const response = await this.amqp.request<ChatApiResponse<string[]>>({
       exchange: BOT_COMMANDS_EXCHANGE,
       routingKey: RK_BOT_GET_TOPIC_MEMBERS,
-      payload: { topicId },
+      payload: { topicId, requesterUserId },
       timeout: 10000
     });
+
+    if (!response.ok) {
+      throw new Error(
+        response.error || response.description || 'Topic access denied'
+      );
+    }
+
     return response.result || [];
   }
 
@@ -433,7 +457,7 @@ export class ChatBridgeService implements OnModuleInit {
   ): Promise<Set<number> | undefined> {
     if (this.chatUserBotMap.size === 0) return undefined;
     try {
-      const memberIds = await this.getTopicMembers(topicId);
+      const memberIds = await this.requestTopicMembers(topicId);
       for (const memberId of memberIds) {
         const botId = this.chatUserBotMap.get(memberId);
         if (botId !== undefined) {
