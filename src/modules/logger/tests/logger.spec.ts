@@ -2,6 +2,7 @@ import { ArgumentsHost, HttpException, HttpStatus } from '@nestjs/common';
 import { AllExceptionsFilter } from '../filters/all-exceptions.filter';
 import { LoggerService } from '../logger.service';
 import { mockReqId, mockRequest, mockContext } from './mocks/logger.mock';
+import { REDACTED_BOT_TOKEN } from 'src/utils/logger/redact-bot-token';
 
 describe('LoggerService', () => {
   describe('AllExceptionsFilter', () => {
@@ -91,6 +92,21 @@ describe('LoggerService', () => {
         message: 'Internal server error',
         reqId: mockReqId
       });
+    });
+
+    it('should redact a bot token from the exception request context', () => {
+      const requestWithToken = {
+        ...mockRequest,
+        url: '/api/bot42:fake-secret/getMe?verbose=true'
+      };
+      mockHttpContext.getRequest.mockReturnValueOnce(requestWithToken);
+
+      filter.catch(new Error('Invalid request'), mockArgumentsHost);
+
+      expect(logger.error).toHaveBeenCalledWith(
+        'Invalid request',
+        `HTTP GET /api/bot${REDACTED_BOT_TOKEN}/getMe?verbose=true reqId=${mockReqId}`
+      );
     });
   });
 });
