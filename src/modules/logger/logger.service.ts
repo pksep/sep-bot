@@ -1,5 +1,10 @@
 import { Injectable, LoggerService as NestLoggerService } from '@nestjs/common';
 import { PinoLogger } from 'nestjs-pino';
+import {
+  redactBotTokenInUrl,
+  redactError,
+  redactLogValue
+} from 'src/utils/logger/redact-bot-token';
 
 @Injectable()
 export class LoggerService implements NestLoggerService {
@@ -7,41 +12,57 @@ export class LoggerService implements NestLoggerService {
 
   log(message: string | object, context?: string) {
     this.logger.info(
-      { context },
-      typeof message === 'string' ? message : JSON.stringify(message)
+      { context: this.safeContext(context) },
+      this.safeMessage(message)
     );
   }
 
   error(error: unknown, context?: string) {
     if (error instanceof Error) {
-      this.logger.error({ err: error, context }, error.message);
-    } else {
+      const safeError = redactError(error);
       this.logger.error(
-        { error, context },
-        typeof error === 'string' ? error : JSON.stringify(error)
+        { err: safeError, context: this.safeContext(context) },
+        safeError.message
+      );
+    } else {
+      const safeError = redactLogValue(error);
+      this.logger.error(
+        { error: safeError, context: this.safeContext(context) },
+        typeof safeError === 'string' ? safeError : JSON.stringify(safeError)
       );
     }
   }
 
   warn(message: string | object, context?: string) {
     this.logger.warn(
-      { context },
-      typeof message === 'string' ? message : JSON.stringify(message)
+      { context: this.safeContext(context) },
+      this.safeMessage(message)
     );
   }
 
   debug(message: string | object, context?: string) {
     this.logger.debug(
-      { context },
-      typeof message === 'string' ? message : JSON.stringify(message)
+      { context: this.safeContext(context) },
+      this.safeMessage(message)
     );
   }
 
   // Подробные (trace) логи
   verbose(message: string | object, context?: string) {
     this.logger.trace(
-      { context },
-      typeof message === 'string' ? message : JSON.stringify(message)
+      { context: this.safeContext(context) },
+      this.safeMessage(message)
     );
+  }
+
+  private safeContext(context?: string): string | undefined {
+    return context ? redactBotTokenInUrl(context) : context;
+  }
+
+  private safeMessage(message: string | object): string {
+    const safeMessage = redactLogValue(message);
+    return typeof safeMessage === 'string'
+      ? safeMessage
+      : JSON.stringify(safeMessage);
   }
 }

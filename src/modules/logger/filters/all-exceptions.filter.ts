@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { LoggerService } from '../logger.service';
+import { redactBotTokenInUrl } from 'src/utils/logger/redact-bot-token';
 
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
@@ -26,7 +27,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
 
     this.logger.error(
       exception instanceof Error ? exception.message : 'Unknown error',
-      `HTTP ${req.method} ${req.url} reqId=${reqId}`
+      `HTTP ${req.method} ${redactBotTokenInUrl(req.url)} reqId=${reqId}`
     );
 
     res.status(status).json({

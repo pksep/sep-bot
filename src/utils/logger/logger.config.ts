@@ -1,5 +1,6 @@
 import { Params } from 'nestjs-pino';
 import { randomUUID } from 'crypto';
+import { redactBotTokenInUrl, redactError } from './redact-bot-token';
 
 const isProd = process.env.NODE_ENV === 'production';
 const ignoredEndpoints = ['/api/health', '/health', '/metrics', '/favicon.ico'];
@@ -19,16 +20,20 @@ const loggerConfig: Params = {
       req: req => ({
         id: req.id,
         method: req.method,
-        url: req.url
+        url: redactBotTokenInUrl(req.url)
       }),
       res: res => ({
         statusCode: res.statusCode
       }),
-      err: err => ({
-        type: err.name,
-        message: err.message,
-        stack: err.stack
-      })
+      err: err => {
+        const safeError = redactError(err);
+
+        return {
+          type: safeError.name,
+          message: safeError.message,
+          stack: safeError.stack
+        };
+      }
     },
     timestamp: () => `,"time":"${new Date().toISOString()}"`,
     genReqId: req => req.headers['x-request-id'] || randomUUID(),
