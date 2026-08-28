@@ -1,5 +1,6 @@
 export interface IUserDataToken {
-  id: number;
+  id: string;
   username: string;
   email: string;
+  type: 'access';
 }

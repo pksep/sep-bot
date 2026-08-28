@@ -13,6 +13,8 @@ export default function configFactory() {
     privateKey: process.env.PRIVATE_KEY!,
     redisUrl: process.env.REDIS_URL!,
     jwtSecret: process.env.JWT_SECRET!,
+    jwtIssuer: process.env.JWT_ISSUER || 'chat-server',
+    jwtAudience: process.env.JWT_AUDIENCE || 'sep-bot',
     botTokenEncryptionKey: process.env.BOT_TOKEN_ENCRYPTION_KEY!,
     rabbitmqUrl: process.env.RABBITMQ_URL || 'amqp://localhost:5672',
     minio: {
