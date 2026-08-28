@@ -4,7 +4,7 @@ import { BotApiService } from './bot-api.service';
 import { BotApiAuthGuard } from './guards/bot-api-auth.guard';
 import { CurrentBot } from './decorators/bot.decorator';
 import { Bot } from '../bots/model/bots.model';
-import { SetMyCommandsDto } from '../bots/dto/bots.dto';
+import { SetMyCommandsDto, SetWebhookDto } from '../bots/dto/bots.dto';
 
 @ApiTags('Bot API')
 @UseGuards(BotApiAuthGuard)
@@ -137,15 +137,7 @@ export class BotApiController {
 
   @ApiOperation({ summary: 'setWebhook - configure webhook' })
   @Post('setWebhook')
-  setWebhook(
-    @CurrentBot() bot: Bot,
-    @Body()
-    body: {
-      url: string;
-      secret?: string;
-      allowed_updates?: string[];
-    }
-  ) {
+  setWebhook(@CurrentBot() bot: Bot, @Body() body: SetWebhookDto) {
     return this.botApiService.setWebhook(bot, body);
   }
 

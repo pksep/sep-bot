@@ -194,7 +194,16 @@ curl -X POST http://localhost:3001/api/bot${BOT_TOKEN}/deleteMessage \
 # Установить webhook (используйте webhook.site для тестирования)
 curl -X POST http://localhost:3001/api/bot${BOT_TOKEN}/setWebhook \
   -H "Content-Type: application/json" \
-  -d '{ "url": "https://webhook.site/<your-uuid>" }'
+  -d '{
+    "url": "https://webhook.site/<your-uuid>",
+    "secret": "test-secret",
+    "allowed_updates": ["message"]
+  }'
+
+# Должен быть отклонён: разрешены только публичные HTTPS-адреса
+curl -X POST http://localhost:3001/api/bot${BOT_TOKEN}/setWebhook \
+  -H "Content-Type: application/json" \
+  -d '{ "url": "http://127.0.0.1/internal" }'
 
 # Проверить
 curl -X POST http://localhost:3001/api/bot${BOT_TOKEN}/getWebhookInfo
@@ -202,6 +211,8 @@ curl -X POST http://localhost:3001/api/bot${BOT_TOKEN}/getWebhookInfo
 # Удалить
 curl -X POST http://localhost:3001/api/bot${BOT_TOKEN}/deleteWebhook
 ```
+
+`setWebhook` валидирует тело запроса во время выполнения: `url` обязателен и должен использовать HTTPS, `secret` — строка длиной 1–256 символов, `allowed_updates` — массив не более чем из 100 строк. После DNS resolution запрещены loopback, private, link-local и зарезервированные адреса. Доставка не следует redirect-ответам, повторно проверяет DNS перед каждым запросом и ограничена таймаутом 10 секунд, payload 1 МБ и ответом 64 КБ.
 
 ---
 
@@ -218,6 +229,8 @@ curl -X POST http://localhost:3001/api/bot${BOT_TOKEN}/deleteWebhook
 | 6 | editMessageText | Редактировать → проверить в чате | Текст изменился |
 | 7 | deleteMessage | Удалить → проверить в чате | Сообщение удалено |
 | 8 | setWebhook | Установить → отправить сообщение | POST на webhook.site |
+| 8a | SSRF-защита webhook | Установить `http://127.0.0.1`, `https://localhost` или URL с private DNS | Ответ `ok: false`, конфигурация не сохраняется |
+| 8b | Redirect webhook | Endpoint отвечает `302` на другой URL | Redirect не выполняется, BullMQ повторяет доставку |
 | 9 | deleteWebhook | Удалить → отправить → getUpdates | Updates приходят через polling |
 | 10 | Невалидный токен | POST /bot{invalid}/getMe | 401 Unauthorized |
 | 11 | Деактивация бота | POST /api/bots/:id/deactivate → getMe | 401 Unauthorized |

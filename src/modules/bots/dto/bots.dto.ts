@@ -4,6 +4,7 @@ import {
   IsArray,
   IsString,
   IsOptional,
+  IsUrl,
   MinLength,
   MaxLength,
   Matches,
@@ -114,4 +115,25 @@ export class SetMyCommandsDto {
   @ValidateNested({ each: true })
   @Type(() => BotCommandDto)
   commands: BotCommandDto[];
+}
+
+export class SetWebhookDto {
+  @ApiProperty({ example: 'https://bot.example.com/webhook' })
+  @IsString()
+  @IsUrl({ protocols: ['https'], require_protocol: true })
+  url: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(256)
+  secret?: string;
+
+  @ApiProperty({ required: false, type: [String] })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(100)
+  @IsString({ each: true })
+  allowed_updates?: string[];
 }
