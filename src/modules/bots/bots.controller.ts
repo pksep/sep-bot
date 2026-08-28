@@ -5,17 +5,19 @@ import {
   Patch,
   Post,
   Param,
-  Headers,
   BadRequestException,
-  ParseIntPipe
+  ParseIntPipe,
+  UseGuards
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { BotsService } from './bots.service';
 import { CreateBotDto, UpdateBotDto } from './dto/bots.dto';
 import { UserId } from '../auth/user-id.decorator';
+import { TokenAuth } from '../auth/jwt-auth.guard';
 
 @ApiTags('Bots Management')
 @ApiBearerAuth()
+@UseGuards(TokenAuth)
 @Controller('bots')
 export class BotsController {
   private readonly uuidPattern =
@@ -23,22 +25,20 @@ export class BotsController {
 
   constructor(private botsService: BotsService) {}
 
-  private resolveOwnerUserId(userId?: string, ownerHeader?: string): string {
-    const ownerUserId = userId || ownerHeader;
-
-    if (!ownerUserId) {
+  private resolveOwnerUserId(userId?: string): string {
+    if (!userId) {
       throw new BadRequestException(
-        'Не удалось определить владельца бота: нет авторизации и заголовка X-Owner-Id'
+        'Не удалось определить владельца бота: нет проверенного access token'
       );
     }
 
-    if (!this.uuidPattern.test(ownerUserId)) {
+    if (!this.uuidPattern.test(userId)) {
       throw new BadRequestException(
         'Некорректный идентификатор владельца бота'
       );
     }
 
-    return ownerUserId;
+    return userId;
   }
 
   private resolveChatUserId(chatUserId?: string): string {
@@ -55,14 +55,8 @@ export class BotsController {
 
   @ApiOperation({ summary: 'Создать нового бота' })
   @Post()
-  async createBot(
-    @UserId() userId: string,
-    @Headers('x-owner-id') ownerHeader: string,
-    @Body() dto: CreateBotDto
-  ) {
-    // В проде владелец берётся из JWT (req.user). Для локального dev-режима,
-    // где гард пропускает запрос без user, владельца передаёт клиент в X-Owner-Id.
-    const ownerUserId = this.resolveOwnerUserId(userId, ownerHeader);
+  async createBot(@UserId() userId: string, @Body() dto: CreateBotDto) {
+    const ownerUserId = this.resolveOwnerUserId(userId);
     const { bot, token } = await this.botsService.createBot(
       ownerUserId,
       dto.username,
@@ -86,11 +80,8 @@ export class BotsController {
 
   @ApiOperation({ summary: 'Получить список моих ботов' })
   @Get()
-  async getMyBots(
-    @UserId() userId: string,
-    @Headers('x-owner-id') ownerHeader: string
-  ) {
-    const ownerUserId = this.resolveOwnerUserId(userId, ownerHeader);
+  async getMyBots(@UserId() userId: string) {
+    const ownerUserId = this.resolveOwnerUserId(userId);
     const bots = await this.botsService.findByOwner(ownerUserId);
     return {
       ok: true,
@@ -137,11 +128,10 @@ export class BotsController {
   @Patch(':id')
   async updateBot(
     @UserId() userId: string,
-    @Headers('x-owner-id') ownerHeader: string,
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateBotDto
   ) {
-    const ownerUserId = this.resolveOwnerUserId(userId, ownerHeader);
+    const ownerUserId = this.resolveOwnerUserId(userId);
 
     const bot = await this.botsService.updateBot(id, ownerUserId, dto);
 
@@ -164,10 +154,9 @@ export class BotsController {
   @Post(':id/regenerate-token')
   async regenerateToken(
     @UserId() userId: string,
-    @Headers('x-owner-id') ownerHeader: string,
     @Param('id', ParseIntPipe) id: number
   ) {
-    const ownerUserId = this.resolveOwnerUserId(userId, ownerHeader);
+    const ownerUserId = this.resolveOwnerUserId(userId);
     const token = await this.botsService.regenerateToken(id, ownerUserId);
     return { ok: true, result: { token } };
   }
@@ -176,10 +165,9 @@ export class BotsController {
   @Post(':id/deactivate')
   async deactivateBot(
     @UserId() userId: string,
-    @Headers('x-owner-id') ownerHeader: string,
     @Param('id', ParseIntPipe) id: number
   ) {
-    const ownerUserId = this.resolveOwnerUserId(userId, ownerHeader);
+    const ownerUserId = this.resolveOwnerUserId(userId);
     await this.botsService.deactivateBot(id, ownerUserId);
     return { ok: true, result: true };
   }
@@ -188,10 +176,9 @@ export class BotsController {
   @Post(':id/activate')
   async activateBot(
     @UserId() userId: string,
-    @Headers('x-owner-id') ownerHeader: string,
     @Param('id', ParseIntPipe) id: number
   ) {
-    const ownerUserId = this.resolveOwnerUserId(userId, ownerHeader);
+    const ownerUserId = this.resolveOwnerUserId(userId);
     await this.botsService.activateBot(id, ownerUserId);
     return { ok: true, result: true };
   }
