@@ -229,7 +229,7 @@ src/modules/
 │
 └── webhooks/             Доставка webhook'ов (BullMQ)
     ├── webhooks.service.ts      → enqueueDelivery() → BullMQ queue
-    └── webhooks.processor.ts    → Worker: HTTP POST + exponential retry
+    └── webhooks.processor.ts    → Worker: защищённый HTTPS POST + exponential retry
 ```
 
 ### A.3. Жизненный цикл запроса — пошагово
@@ -294,6 +294,8 @@ src/modules/
 **Шифрование токенов** — ключ `BOT_TOKEN_ENCRYPTION_KEY` должен быть одинаковым между деплоями. Если потерять ключ, все существующие токены невозможно расшифровать (но верификация по SHA-256 хешу продолжит работать).
 
 **Long polling** — текущая реализация poll-каждую-секунду в цикле. При высокой нагрузке рассмотреть переход на Postgres LISTEN/NOTIFY или Redis pub/sub для real-time уведомлений.
+
+**Безопасность webhook URL** — `setWebhook` принимает только HTTPS URL и до сохранения проверяет все DNS-адреса назначения. Loopback, private, link-local и зарезервированные сети запрещены. При каждой доставке адрес проверяется повторно и запрос закрепляется за проверенным IP, поэтому DNS rebinding не позволяет обратиться во внутреннюю сеть. Redirect-ответы не выполняются; действуют таймаут 10 секунд, лимит исходящего payload 1 МБ и лимит ответа 64 КБ. Успешной считается только доставка с HTTP-статусом `2xx`.
 
 ### A.5. Частые сценарии поддержки
 

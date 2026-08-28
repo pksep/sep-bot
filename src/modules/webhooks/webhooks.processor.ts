@@ -1,8 +1,12 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Job } from 'bullmq';
 import { Injectable } from '@nestjs/common';
-import axios from 'axios';
 import { LoggerService } from '../logger/logger.service';
+import { requestPublicHttps } from '../../utils/security/safe-https';
+
+const WEBHOOK_TIMEOUT_MS = 10_000;
+const MAX_WEBHOOK_PAYLOAD_BYTES = 1024 * 1024;
+const MAX_WEBHOOK_RESPONSE_BYTES = 64 * 1024;
 
 export interface WebhookJobData {
   botId: number;
@@ -16,7 +20,7 @@ export interface WebhookJobData {
 @Processor('webhook-delivery')
 @Injectable()
 export class WebhookProcessor extends WorkerHost {
-  constructor(private logger: LoggerService) {
+  constructor(private readonly logger: LoggerService) {
     super();
   }
 
@@ -33,13 +37,27 @@ export class WebhookProcessor extends WorkerHost {
         headers['X-Telegram-Bot-Api-Secret-Token'] = webhookSecret;
       }
 
-      const response = await axios.post(webhookUrl, payload, {
+      const body = Buffer.from(JSON.stringify(payload));
+
+      if (body.length > MAX_WEBHOOK_PAYLOAD_BYTES) {
+        throw new Error('Webhook payload is too large');
+      }
+
+      headers['Content-Length'] = String(body.length);
+      const response = await requestPublicHttps(webhookUrl, {
+        body,
         headers,
-        timeout: 10000
+        maxResponseBytes: MAX_WEBHOOK_RESPONSE_BYTES,
+        method: 'POST',
+        timeoutMs: WEBHOOK_TIMEOUT_MS
       });
 
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw new Error(`Webhook returned HTTP ${response.statusCode}`);
+      }
+
       this.logger.log(
-        `Webhook delivered: bot=${botId} update=${updateId} status=${response.status}`,
+        `Webhook delivered: bot=${botId} update=${updateId} status=${response.statusCode}`,
         'WebhookProcessor'
       );
     } catch (error) {

@@ -5,6 +5,8 @@ import { BotsService } from '../bots/bots.service';
 import { Bot, BotCommand } from '../bots/model/bots.model';
 import { ITelegramApiResponse } from 'src/core/interface/pagination';
 import { ChatMessage } from '../chat-bridge/interfaces/chat-types';
+import { SetWebhookDto } from '../bots/dto/bots.dto';
+import { resolvePublicHttpsUrl } from '../../utils/security/safe-https';
 
 // ─── DTO interfaces ──────────────────────────────────────
 
@@ -49,12 +51,6 @@ interface GetUpdatesParams {
   offset?: number;
   limit?: number;
   timeout?: number;
-}
-
-interface SetWebhookParams {
-  url: string;
-  secret?: string;
-  allowed_updates?: string[];
 }
 
 interface SetMyCommandsParams {
@@ -286,10 +282,15 @@ export class BotApiService {
 
   async setWebhook(
     bot: Bot,
-    params: SetWebhookParams
+    params: SetWebhookDto
   ): Promise<ITelegramApiResponse> {
     try {
-      await this.botsService.setWebhook(bot.id, params);
+      await resolvePublicHttpsUrl(params.url);
+      await this.botsService.setWebhook(bot.id, {
+        url: params.url,
+        secret: params.secret,
+        allowedUpdates: params.allowed_updates
+      });
       return this.ok(true);
     } catch (err: unknown) {
       return this.error(400, this.getErrorMessage(err));
